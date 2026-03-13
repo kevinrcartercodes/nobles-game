@@ -1,0 +1,2783 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Nobles — v0.7.4 Playtest</title>
+<style>
+  :root {
+    --bg: #1a1d23;
+    --panel: #252932;
+    --panel-light: #2f3440;
+    --text: #e4e6eb;
+    --text-dim: #9aa0ae;
+    --accent: #d4af37;
+    --accent-dark: #b8951f;
+    --danger: #e5534b;
+    --success: #4caf50;
+    --grass: #c4b87a;
+    --forest: #4a6840;
+    --mountain: #6a6a6a;
+    --lake: #1a3d5c;
+    --river: #7ab4d4;
+    --border: #3a3f4b;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    overflow: hidden;
+    user-select: none;
+  }
+  #app {
+    display: grid;
+    grid-template-columns: 280px 1fr 320px;
+    grid-template-rows: 110px 1fr 180px;
+    height: 100vh;
+    gap: 1px;
+    background: var(--border);
+  }
+  #header {
+    grid-column: 1 / -1;
+    background: var(--panel);
+    display: flex;
+    flex-direction: column;
+    padding: 8px 20px;
+    gap: 8px;
+    border-bottom: 2px solid var(--accent);
+  }
+  #header-top {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+  }
+  #header h1 {
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    color: var(--accent);
+  }
+  #header .phase {
+    font-size: 14px;
+    color: var(--text-dim);
+  }
+  #header .phase strong { color: var(--text); }
+  #header .spacer { flex: 1; }
+  #header button {
+    background: var(--accent);
+    color: var(--bg);
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    font-weight: 600;
+    cursor: pointer;
+    font-size: 13px;
+  }
+  #header button:hover { background: var(--accent-dark); }
+  #header button:disabled { background: var(--panel-light); color: var(--text-dim); cursor: not-allowed; }
+
+  #progress-bar {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+    min-height: 42px;
+  }
+  .prog-player {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 140px;
+    padding: 4px 8px;
+    background: var(--panel-light);
+    border-radius: 4px;
+    border-left: 3px solid transparent;
+  }
+  .prog-player.active { border-left-color: var(--accent); background: var(--border); }
+  .prog-player.eliminated { opacity: 0.3; }
+  .prog-name { font-size: 10px; font-weight: 600; display: flex; align-items: center; gap: 4px; }
+  .prog-row { display: flex; align-items: center; gap: 4px; }
+  .prog-label { font-size: 9px; color: var(--text-dim); width: 28px; }
+  .prog-track {
+    flex: 1;
+    height: 8px;
+    background: var(--bg);
+    border-radius: 4px;
+    overflow: hidden;
+    position: relative;
+  }
+  .prog-fill {
+    height: 100%;
+    transition: width 0.3s;
+    border-radius: 4px;
+  }
+  .prog-fill.win { box-shadow: 0 0 8px currentColor; animation: pulse 1s infinite; }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+  .prog-val { font-size: 9px; width: 28px; text-align: right; color: var(--text-dim); }
+
+  #players {
+    background: var(--panel);
+    padding: 12px;
+    overflow-y: auto;
+  }
+  .player-card {
+    background: var(--panel-light);
+    border-radius: 6px;
+    padding: 10px;
+    margin-bottom: 8px;
+    border-left: 4px solid transparent;
+    transition: all 0.2s;
+  }
+  .player-card.active {
+    border-left-color: var(--accent);
+    background: #3a3f4b;
+  }
+  .player-card .name {
+    font-weight: 600;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .player-card .house {
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-top: 2px;
+  }
+  .player-card .stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px 12px;
+    margin-top: 8px;
+    font-size: 12px;
+  }
+  .player-card .stat { color: var(--text-dim); }
+  .player-card .stat b { color: var(--text); }
+  .player-card .stat.win { color: var(--accent); font-weight: 600; }
+
+  #board-wrap {
+    background: #0f1115;
+    overflow: hidden;
+    position: relative;
+  }
+  #board {
+    width: 100%;
+    height: 100%;
+    cursor: grab;
+  }
+  #board.dragging { cursor: grabbing; }
+  .hex { stroke: #0a0c10; stroke-width: 2; transition: all 0.12s; }
+  .hex:hover { filter: brightness(1.2) saturate(1.2); cursor: pointer; transform: scale(1.02); }
+  .hex.grass { fill: url(#grad-grass); }
+  .hex.forest { fill: url(#grad-forest); }
+  .hex.mountain { fill: url(#grad-mountain); }
+  .hex.lake { fill: url(#grad-lake); }
+  .hex.selected { stroke: var(--accent); stroke-width: 4; filter: drop-shadow(0 0 8px var(--accent)); }
+  .hex.movable { stroke: #fff; stroke-width: 3; filter: brightness(1.35) drop-shadow(0 0 6px #fff8); }
+  .hex.attackable { stroke: var(--danger); stroke-width: 3; filter: brightness(1.35) drop-shadow(0 0 6px var(--danger)); }
+  .hex.supply-path { stroke: var(--accent); stroke-width: 2.5; filter: brightness(1.15); }
+  .supply-line { stroke: var(--accent); stroke-width: 3; stroke-dasharray: 6 4; fill: none; opacity: 0.7; pointer-events: none; }
+  .fief { opacity: 0.32; pointer-events: none; }
+  .fief-border { fill: none; stroke-width: 3; pointer-events: none; opacity: 0.9; stroke-linecap: round; }
+  .unit { pointer-events: none; filter: drop-shadow(1px 2px 2px rgba(0,0,0,0.5)); }
+  .unit-shape { stroke: #000; stroke-width: 1.5; }
+  .holding { pointer-events: none; filter: drop-shadow(1px 2px 3px rgba(0,0,0,0.6)); }
+  .damage-badge { pointer-events: none; }
+  .river { stroke: var(--river); stroke-width: 4; fill: none; pointer-events: none; stroke-linecap: round; opacity: 0.85; }
+  .terrain-icon { pointer-events: none; font-size: 14px; opacity: 0.35; }
+
+  #sidebar {
+    background: var(--panel);
+    padding: 14px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .section {
+    background: var(--panel-light);
+    border-radius: 6px;
+    padding: 12px;
+  }
+  .section h3 {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-dim);
+    margin-bottom: 8px;
+  }
+  .section .content { font-size: 13px; line-height: 1.5; }
+  .event-card {
+    border: 1px solid var(--accent);
+    padding: 10px;
+    border-radius: 4px;
+  }
+  .event-card .title { font-weight: 600; color: var(--accent); margin-bottom: 4px; }
+  .event-card .effect { font-size: 12px; color: var(--text-dim); }
+
+  .actions { display: flex; flex-direction: column; gap: 6px; }
+  .actions button {
+    background: var(--panel-light);
+    color: var(--text);
+    border: 1px solid var(--border);
+    padding: 8px 12px;
+    border-radius: 4px;
+    font-size: 13px;
+    cursor: pointer;
+    text-align: left;
+    transition: all 0.15s;
+  }
+  .actions button:hover { background: var(--border); border-color: var(--accent); }
+  .actions button:disabled { opacity: 0.4; cursor: not-allowed; }
+  .actions button.primary { background: var(--accent); color: var(--bg); border-color: var(--accent); font-weight: 600; }
+  .actions button.primary:hover { background: var(--accent-dark); }
+  .actions button.danger { border-color: var(--danger); color: var(--danger); }
+
+  .buy-grid { display: grid; grid-template-columns: 1fr auto; gap: 6px 10px; font-size: 12px; }
+  .buy-grid button {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-size: 11px;
+    cursor: pointer;
+  }
+  .buy-grid button:hover { border-color: var(--accent); }
+  .buy-grid button:disabled { opacity: 0.3; cursor: not-allowed; }
+
+  #log {
+    grid-column: 1 / -1;
+    background: var(--panel);
+    padding: 10px 14px;
+    overflow-y: auto;
+    font-family: 'SF Mono', Monaco, monospace;
+    font-size: 11px;
+    line-height: 1.5;
+    border-top: 1px solid var(--border);
+  }
+  #log .entry { padding: 1px 0; color: var(--text-dim); }
+  #log .entry.turn { color: var(--accent); font-weight: 600; margin-top: 4px; }
+  #log .entry.combat { color: var(--danger); }
+  #log .entry.build { color: var(--success); }
+
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.75);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+  }
+  .modal {
+    background: var(--panel);
+    border-radius: 8px;
+    padding: 24px;
+    min-width: 400px;
+    max-width: 600px;
+    max-height: 80vh;
+    overflow-y: auto;
+    border: 1px solid var(--border);
+  }
+  .modal h2 { color: var(--accent); margin-bottom: 16px; font-size: 20px; }
+  .modal .row { display: flex; gap: 12px; align-items: center; margin-bottom: 10px; }
+  .modal label { font-size: 13px; flex: 1; }
+  .modal select, .modal input {
+    background: var(--panel-light);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 6px 10px;
+    border-radius: 4px;
+    font-size: 13px;
+  }
+  .modal .actions { flex-direction: row; justify-content: flex-end; margin-top: 16px; }
+  .modal .actions button { padding: 10px 20px; }
+
+  /* Tutorial overlay — non-blocking card anchored to a corner */
+  #tutorial-card {
+    position: fixed;
+    top: 130px;
+    right: 340px;
+    width: 320px;
+    background: var(--panel);
+    border: 2px solid var(--accent);
+    border-radius: 8px;
+    padding: 16px;
+    z-index: 50;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+    display: none;
+    animation: slideIn 0.25s ease-out;
+  }
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateX(20px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+  #tutorial-card h3 { color: var(--accent); font-size: 15px; margin-bottom: 8px; display: flex; align-items: center; gap: 6px; }
+  #tutorial-card .tut-body { font-size: 13px; line-height: 1.5; color: var(--text); }
+  #tutorial-card .tut-body b { color: var(--accent); }
+  #tutorial-card .tut-actions { display: flex; gap: 8px; margin-top: 12px; justify-content: flex-end; }
+  #tutorial-card .tut-actions button {
+    padding: 6px 12px; font-size: 12px; border-radius: 4px; border: none; cursor: pointer; font-weight: 600;
+  }
+  #tutorial-card .tut-actions button.primary { background: var(--accent); color: var(--bg); }
+  #tutorial-card .tut-actions button.skip { background: var(--panel-light); color: var(--text-dim); }
+  #tutorial-card .tut-progress { font-size: 10px; color: var(--text-dim); margin-top: 8px; }
+
+  .negotiate-panel { display: flex; flex-direction: column; gap: 8px; }
+  .negotiate-panel select, .negotiate-panel input {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 6px;
+    border-radius: 4px;
+    font-size: 12px;
+    width: 100%;
+  }
+
+  .color-dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
+  .tooltip {
+    position: absolute;
+    background: var(--panel);
+    border: 1px solid var(--accent);
+    border-radius: 4px;
+    padding: 8px 12px;
+    font-size: 12px;
+    pointer-events: none;
+    z-index: 50;
+    max-width: 220px;
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="header">
+    <div id="header-top">
+      <h1>⚔ NOBLES</h1>
+      <div class="phase" id="phase-display">Setup</div>
+      <div class="spacer"></div>
+      <button id="btn-help">Rules</button>
+      <button id="btn-houses">Houses</button>
+      <button id="btn-new-game">New Game</button>
+      <button id="btn-end-turn" disabled>End Turn</button>
+    </div>
+    <div id="progress-bar"></div>
+  </div>
+  <div id="players"></div>
+  <div id="board-wrap">
+    <svg id="board" viewBox="0 0 1200 900">
+      <defs>
+        <radialGradient id="grad-grass" cx="40%" cy="30%">
+          <stop offset="0%" stop-color="#d4c88a"/>
+          <stop offset="100%" stop-color="#b5a768"/>
+        </radialGradient>
+        <radialGradient id="grad-forest" cx="40%" cy="30%">
+          <stop offset="0%" stop-color="#5a7a4a"/>
+          <stop offset="100%" stop-color="#3d5533"/>
+        </radialGradient>
+        <radialGradient id="grad-mountain" cx="40%" cy="30%">
+          <stop offset="0%" stop-color="#8a8a8a"/>
+          <stop offset="100%" stop-color="#4a4a4a"/>
+        </radialGradient>
+        <radialGradient id="grad-lake" cx="50%" cy="30%">
+          <stop offset="0%" stop-color="#2a5d8f"/>
+          <stop offset="100%" stop-color="#0d2845"/>
+        </radialGradient>
+      </defs>
+    </svg>
+    <div id="tooltip" class="tooltip" style="display:none"></div>
+  </div>
+  <div id="sidebar">
+    <div class="section" id="event-section">
+      <h3>Current Event</h3>
+      <div class="content" id="event-content">—</div>
+    </div>
+    <div class="section">
+      <h3>Selected</h3>
+      <div class="content" id="selection-content">Click a hex</div>
+    </div>
+    <div class="section">
+      <h3>Actions</h3>
+      <div class="actions" id="actions-content"></div>
+    </div>
+    <div class="section" id="buy-section">
+      <h3>Buy</h3>
+      <div class="buy-grid" id="buy-content"></div>
+    </div>
+    <div class="section" id="negotiate-section">
+      <h3>Negotiate</h3>
+      <div class="negotiate-panel" id="negotiate-content"></div>
+    </div>
+  </div>
+  <div id="log"></div>
+</div>
+
+<div id="setup-modal" class="modal-overlay">
+  <div class="modal">
+    <h2>New Game of Nobles</h2>
+    <div class="row">
+      <label>Difficulty</label>
+      <select id="setup-difficulty">
+        <option value="tutorial">Tutorial — tips as you play</option>
+        <option value="easy">Easy — passive AI</option>
+        <option value="medium" selected>Medium — balanced AI</option>
+        <option value="hard">Hard — aggressive AI +bonus</option>
+      </select>
+    </div>
+    <div class="row">
+      <label>Number of players</label>
+      <select id="setup-count">
+        <option value="3">3</option>
+        <option value="4" selected>4</option>
+        <option value="5">5</option>
+        <option value="6">6</option>
+      </select>
+    </div>
+    <div id="setup-slots"></div>
+    <div class="actions">
+      <button id="setup-start" class="primary">Start Game</button>
+    </div>
+  </div>
+</div>
+
+<div id="victory-modal" class="modal-overlay" style="display:none">
+  <div class="modal">
+    <h2 id="victory-title">Victory!</h2>
+    <div class="content" id="victory-content"></div>
+    <div class="actions">
+      <button onclick="document.getElementById('victory-modal').style.display='none'">Close</button>
+      <button class="primary" onclick="location.reload()">New Game</button>
+    </div>
+  </div>
+</div>
+
+<div id="help-modal" class="modal-overlay" style="display:none">
+  <div class="modal" style="max-width:700px">
+    <h2>Quick Reference</h2>
+    <div class="content" style="font-size:13px;line-height:1.6">
+      <h3 style="color:var(--accent);margin-top:12px">Win Conditions</h3>
+      <p><b>Population 15</b> · <b>Tax Collected 50</b> · <b>Army 8</b> — first to hit any one wins.</p>
+
+      <h3 style="color:var(--accent);margin-top:12px">Combat (Rock-Paper-Scissors)</h3>
+      <p>Spearman ▲ kills Knight ◆ · Knight ◆ kills Bowman ● · Bowman ● kills Spearman ▲<br>
+      Same-type ties kill both — unless defender is on Forest, then defender wins.<br>
+      Bowman vs Bowman at range: both die. Bowman vs Knight at range: no effect.</p>
+
+      <h3 style="color:var(--accent);margin-top:12px">Supply Lines</h3>
+      <p><b>Path:</b> traces ONLY through <b>your own fiefs</b> — unclaimed tiles block just like enemy tiles.<br>
+      <b>Cost:</b> 1g/tile to nearest holding (Outposts count). Paid when you click End Turn.<br>
+      <b>Survival:</b> must reach a <b>Castle or Village</b>. Outpost-only = unit dies.<br>
+      Quartermaster / paid passage let you cross <i>enemy</i> fiefs (not unclaimed).</p>
+
+      <h3 style="color:var(--accent);margin-top:12px">Siege & Capture</h3>
+      <p>Damage ticks at <b>end of round</b>: besieger on the holding + <b>every adjacent enemy unit</b> = 1 dmg each.<br>
+      Bowmen contribute <b>unless</b> they fired their ranged attack elsewhere this round.<br>
+      Fighting your way to the adjacent tile still counts — position matters, not how you got there.<br>
+      <b>Heals +1/round</b> only if no enemy on top (adjacent enemies don't block heal).<br>
+      Pop 0 + your unit on it = <b>captured</b>. Capturing a Castle eliminates that player.</p>
+
+      <h3 style="color:var(--accent);margin-top:12px">Building</h3>
+      <p><b>Outpost</b> (20g): your unit on your fief + 1-tile spacing.<br>
+      <b>Village</b> (20g): <b>upgrade an Outpost</b> — select the outpost, click upgrade.<br>
+      <b>Units</b>: 1/round max, placed at <b>any of your holdings</b> (castle/village/outpost).</p>
+
+      <h3 style="color:var(--accent);margin-top:12px">Movement Special Cases</h3>
+      <p>Forest ends movement. River crossing ends movement. Mountain/Lake impassable.<br>
+      <b>Knights conquer tiles they pass through</b> — 2-hex move = 2 fiefs claimed.</p>
+
+      <h3 style="color:var(--accent);margin-top:12px">What's New in v0.7</h3>
+      <p style="color:var(--text-dim)">Houses dealt randomly · Per-tile supply cost restored · Enemy fiefs block supply · Holdings captured not razed · Gradual siege heal · Unit-on-fief build requirement · Knight conquers jumped tiles</p>
+    </div>
+    <div class="actions">
+      <button class="primary" onclick="document.getElementById('help-modal').style.display='none'">Close</button>
+    </div>
+  </div>
+</div>
+
+<div id="houses-modal" class="modal-overlay" style="display:none">
+  <div class="modal" style="max-width:600px">
+    <h2>The Six Houses</h2>
+    <div class="content" id="houses-content" style="font-size:13px"></div>
+    <div class="actions">
+      <button class="primary" onclick="document.getElementById('houses-modal').style.display='none'">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Tutorial hint card (non-blocking overlay, Tutorial difficulty only) -->
+<div id="tutorial-card">
+  <h3 id="tut-title"></h3>
+  <div class="tut-body" id="tut-body"></div>
+  <div class="tut-progress" id="tut-progress"></div>
+  <div class="tut-actions">
+    <button class="skip" id="tut-skip">Skip all tips</button>
+    <button class="primary" id="tut-next">Got it</button>
+  </div>
+</div>
+
+<script>
+// ============================================================================
+// CONSTANTS & DATA
+// ============================================================================
+
+const COLORS = ['#e53935', '#1e88e5', '#43a047', '#fb8c00', '#8e24aa', '#00acc1'];
+const COLOR_NAMES = ['Red', 'Blue', 'Green', 'Orange', 'Purple', 'Teal'];
+
+const UNIT_TYPES = {
+  spearman: { move: 1, cost: 20, icon: '▲', beats: 'knight' },
+  bowman:   { move: 1, cost: 25, icon: '●', beats: 'spearman' },
+  knight:   { move: 2, cost: 30, icon: '◆', beats: 'bowman' }
+};
+
+const HOLDING_TYPES = {
+  castle:  { pop: 5, cost: null },
+  village: { pop: 3, cost: 20 },   // upgrade from outpost
+  outpost: { pop: 1, cost: 20 }
+};
+
+const WIN = { pop: 15, fees: 50, army: 8 };
+const STARTING_GOLD = 15;
+const COMPONENT_LIMITS = { outpost: 15, village: 10 };
+
+const HOUSES = [
+  { key: 'architect',     name: 'The Architect',     icon: '🏘️', power: 'Village upgrade 15g (−5)' },
+  { key: 'castellan',     name: 'The Castellan',     icon: '🏕️', power: 'Outposts cost 15g (−5)' },
+  { key: 'chancellor',    name: 'The Chancellor',    icon: '💰', power: '+2g every Upkeep' },
+  { key: 'surveyor',      name: 'The Surveyor',      icon: '🗺️', power: '+1g per unclaimed tile conquered' },
+  { key: 'marshal',       name: 'The Marshal',       icon: '⚔️', power: 'Start with 2 Spearmen' },
+  { key: 'quartermaster', name: 'The Quartermaster', icon: '📦', power: 'Supply traces through enemy fiefs' }
+];
+
+const EVENTS = [
+  { name: 'Plague', cat: 'brake', effect: 'Highest-pop player loses 1 pop from their top holding',
+    resolve: (g) => {
+      let maxPop = -1, targets = [];
+      g.players.forEach(p => { if (!p.eliminated) { const tp = totalPop(g, p); if (tp > maxPop) { maxPop = tp; targets = [p]; } else if (tp === maxPop) targets.push(p); }});
+      targets.forEach(p => {
+        let best = null, bp = -1;
+        g.hexes.forEach(h => { if (h.holding && h.holding.owner === p.id) { const cp = currentPop(h); if (cp > bp) { bp = cp; best = h; }}});
+        if (best && bp > 0) { best.holding.damage = Math.min(best.holding.damage + 1, HOLDING_TYPES[best.holding.type].pop); log(g, `Plague strikes ${p.name}'s ${best.holding.type}`, 'combat'); }
+      });
+    }},
+  { name: 'Banditry', cat: 'brake', effect: 'Each player with 4+ units disbands one',
+    resolve: (g) => {
+      g.players.forEach(p => {
+        if (p.eliminated) return;
+        const units = g.hexes.filter(h => h.unit && h.unit.owner === p.id);
+        if (units.length >= 4) {
+          const victim = p.ai ? aiPickDisbandVictim(g, p, units) : units[0]; // human picks later via UI but for now auto
+          victim.unit = null;
+          log(g, `Banditry: ${p.name} loses a ${victim._lastUnitType || 'unit'}`, 'combat');
+        }
+      });
+    }},
+  { name: 'Uprising', cat: 'brake', effect: 'Outposts produce no pop income this round', flag: 'uprising' },
+  { name: 'Tax Revolt', cat: 'brake', effect: 'Highest Tax Collected gets half income', flag: 'taxRevolt' },
+  { name: 'Caravan', cat: 'catchup', effect: 'Fewest fiefs gets +5g',
+    resolve: (g) => {
+      let min = Infinity, targets = [];
+      g.players.forEach(p => { if (!p.eliminated) { const f = countFiefs(g, p.id); if (f < min) { min = f; targets = [p]; } else if (f === min) targets.push(p); }});
+      targets.forEach(p => { p.gold += 5; log(g, `Caravan: ${p.name} +5g`, 'build'); });
+    }},
+  { name: 'Recruitment Drive', cat: 'catchup', effect: 'Fewest units gets a free Spearman',
+    resolve: (g) => {
+      let min = Infinity, targets = [];
+      g.players.forEach(p => { if (!p.eliminated) { const u = countUnits(g, p.id); if (u < min) { min = u; targets = [p]; } else if (u === min) targets.push(p); }});
+      targets.forEach(p => {
+        const castle = g.hexes.find(h => h.holding && h.holding.type === 'castle' && h.holding.owner === p.id);
+        if (castle && !castle.unit) { castle.unit = { type: 'spearman', owner: p.id, moved: true, attacked: true }; log(g, `Recruitment: ${p.name} gains a Spearman`, 'build'); }
+      });
+    }},
+  { name: 'Royal Favor', cat: 'catchup', effect: 'Lowest Tax Collected gets −15g on one holding', flag: 'royalFavor' },
+  { name: 'Tithe', cat: 'catchup', effect: 'Each player gives 1g to the poorest',
+    resolve: (g) => {
+      const alive = g.players.filter(p => !p.eliminated);
+      let min = Infinity, poorest = [];
+      alive.forEach(p => { if (p.gold < min) { min = p.gold; poorest = [p]; } else if (p.gold === min) poorest.push(p); });
+      const givers = alive.filter(p => !poorest.includes(p));
+      const pot = givers.length;
+      givers.forEach(p => p.gold -= 1);
+      const share = Math.floor(pot / poorest.length);
+      poorest.forEach(p => p.gold += share);
+      log(g, `Tithe: ${poorest.map(p=>p.name).join(', ')} receive ${share}g each`);
+    }},
+  { name: 'Winter', cat: 'tempo', effect: 'Rivers have no effect', flag: 'winter' },
+  { name: 'Fog', cat: 'tempo', effect: 'No Bowman ranged attacks', flag: 'fog' },
+  { name: 'Mud Season', cat: 'tempo', effect: 'All movement capped at 1', flag: 'mud' },
+  { name: 'Clear Skies', cat: 'tempo', effect: 'Bowmen ranged attack at range 2', flag: 'clearSkies' },
+  { name: 'Forced March', cat: 'tempo', effect: '+1 movement for all', flag: 'forcedMarch' },
+  { name: 'Peace Treaty', cat: 'tempo', effect: 'No combat or siege this round', flag: 'peace' },
+  { name: 'Bumper Harvest', cat: 'accel', effect: '+3g to all',
+    resolve: (g) => { g.players.forEach(p => { if (!p.eliminated) p.gold += 3; }); log(g, 'Bumper Harvest: all +3g', 'build'); }},
+  { name: 'Market Day', cat: 'accel', effect: 'Units −5g (min 5)', flag: 'marketDay' },
+  { name: 'Building Boom', cat: 'accel', effect: 'Holdings −10g (min 10)', flag: 'buildingBoom' },
+  { name: 'Mercenary Captain', cat: 'interact', effect: 'Auction a Knight',
+    resolve: (g) => {
+      // Simplified: highest gold that can afford 5g+ bids; AI bids up to 20g
+      const alive = g.players.filter(p => !p.eliminated);
+      let highBid = 0, winner = null;
+      const order = [];
+      for (let i = 0; i < alive.length; i++) order.push(g.players[(g.firstPlayer + i) % g.players.length]);
+      order.forEach(p => {
+        if (p.eliminated) return;
+        let bid = 0;
+        if (p.ai) {
+          const want = Math.min(20, p.gold);
+          if (want > highBid) bid = highBid + 5 > want ? want : highBid + 5;
+        } else {
+          // human: auto-pass for now (could add modal)
+          bid = 0;
+        }
+        if (bid > highBid) { highBid = bid; winner = p; }
+      });
+      if (winner && highBid > 0) {
+        winner.gold -= highBid;
+        const castle = g.hexes.find(h => h.holding && h.holding.type === 'castle' && h.holding.owner === winner.id);
+        if (castle && !castle.unit) { castle.unit = { type: 'knight', owner: winner.id, moved: true, attacked: true }; log(g, `${winner.name} wins the Mercenary for ${highBid}g`, 'build'); }
+      } else { log(g, 'Mercenary auction: all pass'); }
+    }},
+  { name: 'Royal Envoy', cat: 'interact', effect: 'No negotiation this round', flag: 'noNegotiate' },
+  { name: 'Council of Nobles', cat: 'interact', effect: 'Point: most-pointed loses 3g',
+    resolve: (g) => {
+      // AI points at highest fees; humans auto-point at highest fees for simplicity
+      const alive = g.players.filter(p => !p.eliminated);
+      if (alive.length < 3) { log(g, 'Council: too few players, no effect'); return; }
+      const votes = {};
+      alive.forEach(voter => {
+        let target = null, maxF = -1;
+        alive.forEach(p => { if (p.id !== voter.id) { const f = calcFees(g, p); if (f > maxF) { maxF = f; target = p; }}});
+        if (target) votes[target.id] = (votes[target.id] || 0) + 1;
+      });
+      let max = 0, loser = null, tie = false;
+      Object.entries(votes).forEach(([id, v]) => { if (v > max) { max = v; loser = id; tie = false; } else if (v === max) tie = true; });
+      if (loser && !tie) {
+        const p = g.players.find(pp => pp.id === +loser);
+        p.gold = Math.max(0, p.gold - 3);
+        log(g, `Council: ${p.name} most-pointed, −3g`, 'combat');
+      } else { log(g, 'Council: tie, no effect'); }
+    }}
+];
+
+// ============================================================================
+// HEX MATH (axial coords)
+// ============================================================================
+
+const HEX_SIZE = 32;
+const SQRT3 = Math.sqrt(3);
+
+function hexToPixel(q, r) {
+  return {
+    x: HEX_SIZE * (SQRT3 * q + SQRT3/2 * r),
+    y: HEX_SIZE * (3/2 * r)
+  };
+}
+function hexKey(q, r) { return `${q},${r}`; }
+const DIRS = [[1,0],[1,-1],[0,-1],[-1,0],[-1,1],[0,1]];
+function neighbors(q, r) { return DIRS.map(([dq,dr]) => [q+dq, r+dr]); }
+function hexDist(a, b) {
+  return (Math.abs(a.q - b.q) + Math.abs(a.q + a.r - b.q - b.r) + Math.abs(a.r - b.r)) / 2;
+}
+
+// ============================================================================
+// MAP GENERATION
+// ============================================================================
+
+function generateMap(numPlayers) {
+  const numTracts = numPlayers + 2;
+  const tractCenters = [];
+  const placed = new Set();
+
+  // Spiral out tract centers
+  tractCenters.push([0, 0]);
+  const ring = [[4,-2],[2,2],[-2,4],[-4,2],[-2,-2],[2,-4],[6,0],[0,6]];
+  for (let i = 0; i < numTracts - 1 && i < ring.length; i++) tractCenters.push(ring[i]);
+
+  const hexes = [];
+  const hexMap = {};
+  const terrainPools = [
+    { grass: 0.82, forest: 0.12, mountain: 0.03, lake: 0.03 },  // lowland
+    { grass: 0.65, forest: 0.25, mountain: 0.08, lake: 0.02 },  // highland
+    { grass: 0.65, forest: 0.12, mountain: 0.03, lake: 0.20 },  // wetland
+  ];
+
+  tractCenters.slice(0, numTracts).forEach(([cq, cr], ti) => {
+    const pool = terrainPools[ti % 3];
+    // radius-2 hex = 19 hexes, trim a few
+    for (let dq = -2; dq <= 2; dq++) {
+      for (let dr = Math.max(-2, -dq-2); dr <= Math.min(2, -dq+2); dr++) {
+        const q = cq + dq, r = cr + dr;
+        const key = hexKey(q, r);
+        if (placed.has(key)) continue;
+        placed.add(key);
+        const roll = Math.random();
+        let acc = 0, terrain = 'grass';
+        for (const [t, w] of Object.entries(pool)) { acc += w; if (roll < acc) { terrain = t; break; }}
+        // river edges: random subset
+        const rivers = [];
+        if (terrain === 'grass' && Math.random() < 0.12) {
+          const d = Math.floor(Math.random() * 6);
+          rivers.push(d);
+        }
+        const hex = { q, r, terrain, rivers, tract: ti, fief: null, unit: null, holding: null };
+        hexes.push(hex);
+        hexMap[key] = hex;
+      }
+    }
+  });
+
+  // Ensure enough grass for castles
+  const grassCount = hexes.filter(h => h.terrain === 'grass').length;
+  if (grassCount < numPlayers * 3) {
+    hexes.filter(h => h.terrain === 'mountain').slice(0, numPlayers * 3 - grassCount).forEach(h => h.terrain = 'grass');
+  }
+
+  return { hexes, hexMap };
+}
+
+// ============================================================================
+// GAME STATE
+// ============================================================================
+
+let G = null;
+
+// ============================================================================
+// TUTORIAL SYSTEM
+// ============================================================================
+
+const TUTORIAL_CARDS = {
+  welcome: {
+    title: '👑 Welcome to Nobles',
+    body: `You're <b>Player 1</b>. Win by reaching any of: <b>15 Population</b>, <b>50 Tax Collected</b>, or <b>8-unit Army</b>.<br><br>First, click a <b>grassland hex</b> to place your castle. You place last — the AI picks first since you'll go first every turn.`
+  },
+  firstTurn: {
+    title: '⚔️ Your First Turn',
+    body: `Your spearman is on your castle. <b>Click the spearman</b>, then click <b>Move this unit</b> in the sidebar, then click a highlighted hex.<br><br>Moving onto a tile <b>claims it as your fief</b> — more fiefs = more tax income.`
+  },
+  movement: {
+    title: '🗺️ Movement & Conquering',
+    body: `Every tile you move onto becomes <b>your fief</b>. Spearmen/Bowmen move 1, <b>Knights move 2</b> and claim both tiles they pass through.<br><br>Forests and rivers end movement early. Mountains/lakes are impassable.`
+  },
+  supply: {
+    title: '📦 Supply Lines',
+    body: `Each unit costs <b>1g per tile</b> back to your nearest holding — paid when you click End Turn.<br><br>Supply traces <b>only through your own fiefs</b>. A unit with no path to your Castle or Village <b>dies</b>. Outposts reduce cost but don't prevent death.`
+  },
+  building: {
+    title: '🏗️ Building',
+    body: `In the <b>Buy</b> panel: recruit a unit (1/round) at any holding, build an <b>Outpost</b> (20g, your unit on your fief), or upgrade Outpost→<b>Village</b> (20g).<br><br>Villages are supply anchors and give +3 pop. Outposts just reduce supply cost.`
+  },
+  combat: {
+    title: '⚔️ Combat — Rock Paper Scissors',
+    body: `<b>Spearman ▲</b> kills Knight · <b>Knight ◆</b> kills Bowman · <b>Bowman ●</b> kills Spearman.<br><br>Same type = both die (except defender on Forest wins). Moving into combat uses a Bowman's ranged attack.`
+  },
+  bowman: {
+    title: '🏹 Bowman Ranged Attack',
+    body: `Bowmen can <b>move then shoot</b> — click <b>Ranged attack</b> after moving to fire at an adjacent enemy.<br><br>You choose: shoot a unit, or <b>bombard an enemy building</b> (1 siege damage). Can't do both.`
+  },
+  siege: {
+    title: '🔥 Siege',
+    body: `Sieges tick at <b>end of round</b>: your unit ON an enemy holding = 1 dmg, each adjacent spearman/knight = 1 dmg.<br><br>Hover a building to see <b>🔥-N</b> siege pressure. Pop 0 + your unit on it = captured. Capturing a Castle eliminates that player.`
+  },
+  houses: {
+    title: '🏛️ Your House',
+    body: `You were dealt a <b>House</b> with a passive bonus — it's shown on your player card (left side). Click the <b>Houses</b> button at the top to see all six.`
+  },
+  endTurn: {
+    title: '⏭️ Ending Your Turn',
+    body: `Click <b>End Turn</b> when done. Your supply cost is paid immediately, then the AI takes its turns, then the round ends with siege damage + healing.`
+  },
+};
+
+const TUTORIAL_ORDER = Object.keys(TUTORIAL_CARDS);
+
+function showTutorial(key) {
+  if (!G || G.difficulty !== 'tutorial') return;
+  if (G.tutorialSkipped) return;
+  if (G.tutorialShown.has(key)) return;
+  G.tutorialShown.add(key);
+
+  const card = TUTORIAL_CARDS[key];
+  if (!card) return;
+
+  const el = document.getElementById('tutorial-card');
+  document.getElementById('tut-title').innerHTML = card.title;
+  document.getElementById('tut-body').innerHTML = card.body;
+  document.getElementById('tut-progress').textContent =
+    `Tip ${G.tutorialShown.size} of ${TUTORIAL_ORDER.length}`;
+  el.style.display = 'block';
+
+  // restart the slide-in animation
+  el.style.animation = 'none';
+  void el.offsetWidth;
+  el.style.animation = '';
+}
+
+function dismissTutorial() {
+  document.getElementById('tutorial-card').style.display = 'none';
+}
+
+function skipAllTutorials() {
+  if (G) G.tutorialSkipped = true;
+  dismissTutorial();
+  log(G, 'Tutorial tips skipped — click Rules any time for a refresher', 'turn');
+}
+
+function newGame(playerConfigs, difficulty = 'medium') {
+  const n = playerConfigs.length;
+  const { hexes, hexMap } = generateMap(n);
+
+  const houses = [...HOUSES];
+  shuffle(houses);
+
+  const players = playerConfigs.map((cfg, i) => ({
+    id: i,
+    name: cfg.name || COLOR_NAMES[i],
+    color: COLORS[i],
+    ai: cfg.ai,
+    house: houses[i],
+    gold: STARTING_GOLD,
+    eliminated: false,
+    capturedHolding: false,
+    unitBuiltThisRound: false,
+    rightOfPassage: new Set(), // player IDs granting passage this round
+  }));
+
+  // Build event deck
+  const deck = [...EVENTS];
+  shuffle(deck);
+
+  // Difficulty-based starting gold for AI
+  const aiGoldBonus = difficulty === 'hard' ? 10 : difficulty === 'easy' ? -5 : 0;
+  players.forEach(p => { if (p.ai) p.gold = Math.max(5, p.gold + aiGoldBonus); });
+
+  G = {
+    players, hexes, hexMap,
+    round: 1,
+    phase: 'setup-castle',
+    // Castle placement runs in REVERSE (last player picks first — best terrain
+    // compensation for going last in turn order). Game play then starts at P0.
+    turn: players.length - 1,
+    firstPlayer: 0,
+    selected: null,
+    mode: null,
+    currentEvent: null,
+    eventFlags: {},
+    eventDeck: deck,
+    eventDiscard: [],
+    logEntries: [],
+    componentsUsed: { outpost: 0, village: 0 },
+    difficulty,
+    tutorialShown: new Set(),
+    tutorialSkipped: false,
+  };
+
+  log(G, `=== NEW GAME — ${n} players — ${difficulty.toUpperCase()} ===`, 'turn');
+  log(G, `Houses: ${players.map(p => `${p.name}→${p.house.name}`).join(', ')}`);
+
+  render();
+
+  // Auto-place AI castles if current turn is AI
+  maybeRunAI();
+}
+
+// ============================================================================
+// RULES ENGINE
+// ============================================================================
+
+function getHex(q, r) { return G.hexMap[hexKey(q, r)]; }
+function isPassable(h) { return h && h.terrain !== 'mountain' && h.terrain !== 'lake'; }
+function isImpassable(h) { return !h || h.terrain === 'mountain' || h.terrain === 'lake'; }
+
+function currentPop(hex) {
+  if (!hex.holding) return 0;
+  return HOLDING_TYPES[hex.holding.type].pop - hex.holding.damage;
+}
+function totalPop(g, p) {
+  let pop = 0;
+  g.hexes.forEach(h => { if (h.holding && h.holding.owner === p.id) pop += g.eventFlags.uprising && h.holding.type === 'outpost' ? 0 : currentPop(h); });
+  return pop;
+}
+function countFiefs(g, pid) { return g.hexes.filter(h => h.fief === pid).length; }
+function countUnits(g, pid) { return g.hexes.filter(h => h.unit && h.unit.owner === pid).length; }
+function calcFees(g, p) { return countFiefs(g, p.id) + totalPop(g, p); }
+
+function unitCost(g, type) {
+  let c = UNIT_TYPES[type].cost;
+  if (g.eventFlags.marketDay) c = Math.max(5, c - 5);
+  return c;
+}
+function holdingCost(g, p, type) {
+  let c = HOLDING_TYPES[type].cost;
+  if (type === 'village' && p.house.key === 'architect') c = 15;
+  if (type === 'outpost' && p.house.key === 'castellan') c = 15;
+  if (g.eventFlags.buildingBoom) c = Math.max(10, c - 10);
+  if (g.eventFlags.royalFavor && g.eventFlags.royalFavorTarget === p.id && !p._usedRoyalFavor) {
+    c = Math.max(0, c - 15);
+  }
+  return c;
+}
+
+// --- Movement validation ---
+
+function getValidMoves(hex) {
+  if (!hex.unit || hex.unit.moved) return [];
+  const p = G.players[hex.unit.owner];
+  let range = UNIT_TYPES[hex.unit.type].move;
+  if (G.eventFlags.mud) range = 1;
+  if (G.eventFlags.forcedMarch) range += 1;
+
+  const results = [];
+  const visited = new Set([hexKey(hex.q, hex.r)]);
+  // Track path: each frontier node remembers hexes it passed through (excluding start)
+  let frontier = [{ h: hex, steps: 0, path: [] }];
+
+  while (frontier.length) {
+    const next = [];
+    for (const node of frontier) {
+      if (node.steps >= range) continue;
+      for (const [nq, nr] of neighbors(node.h.q, node.h.r)) {
+        const nh = getHex(nq, nr);
+        if (!nh) continue;
+        const key = hexKey(nq, nr);
+        if (visited.has(key)) continue;
+        if (isImpassable(nh)) continue;
+        // friendly unit blocks
+        if (nh.unit && nh.unit.owner === hex.unit.owner) continue;
+
+        const endsMove = nh.terrain === 'forest' || hasRiverBetween(node.h, nh) || (nh.unit && nh.unit.owner !== hex.unit.owner) || (nh.holding && nh.holding.owner !== hex.unit.owner);
+
+        visited.add(key);
+        // path = tiles passed through to get here (Knight conquers these)
+        const path = [...node.path];
+        if (node.h !== hex) path.push(node.h);
+        results.push({
+          hex: nh,
+          path,
+          combat: nh.unit && nh.unit.owner !== hex.unit.owner,
+          siege: nh.holding && nh.holding.owner !== hex.unit.owner && !nh.unit
+        });
+        if (!endsMove) next.push({ h: nh, steps: node.steps + 1, path: [...path] });
+      }
+    }
+    frontier = next;
+  }
+  return results;
+}
+
+function hasRiverBetween(a, b) {
+  if (G.eventFlags.winter) return false;
+  // Check if edge between a and b is a river (from either side)
+  const dirIdx = DIRS.findIndex(([dq, dr]) => a.q + dq === b.q && a.r + dr === b.r);
+  if (dirIdx === -1) return false;
+  if (a.rivers && a.rivers.includes(dirIdx)) return true;
+  const opp = (dirIdx + 3) % 6;
+  if (b.rivers && b.rivers.includes(opp)) return true;
+  return false;
+}
+
+// --- Combat ---
+
+function resolveCombat(attackerHex, defenderHex, isRanged = false) {
+  const atk = attackerHex.unit, def = defenderHex.unit;
+  if (G.eventFlags.peace) { log(G, 'Peace Treaty: combat prevented'); return 'blocked'; }
+  const beats = UNIT_TYPES[atk.type].beats === def.type;
+  const loses = UNIT_TYPES[def.type].beats === atk.type;
+  const tie = !beats && !loses;
+
+  if (isRanged) {
+    if (beats) {
+      log(G, `${pname(atk.owner)}'s Bowman shoots ${pname(def.owner)}'s ${def.type}`, 'combat');
+      defenderHex.unit = null;
+      return 'atk';
+    } else if (tie) {
+      // Bowman vs Bowman — both die, regardless of range
+      log(G, `${pname(atk.owner)}'s and ${pname(def.owner)}'s Bowmen trade shots — both fall`, 'combat');
+      attackerHex.unit = null;
+      defenderHex.unit = null;
+      return 'both';
+    } else {
+      log(G, `${pname(atk.owner)}'s arrow glances off the ${def.type}`, 'combat');
+      return 'miss';
+    }
+  }
+
+  if (tie) {
+    if (defenderHex.terrain === 'forest') {
+      log(G, `${pname(def.owner)}'s ${def.type} holds the forest vs ${pname(atk.owner)}'s ${atk.type}`, 'combat');
+      attackerHex.unit = null;
+      return 'def';
+    }
+    log(G, `${pname(atk.owner)}'s ${atk.type} and ${pname(def.owner)}'s ${def.type} destroy each other`, 'combat');
+    attackerHex.unit = null;
+    defenderHex.unit = null;
+    return 'both';
+  } else if (beats) {
+    log(G, `${pname(atk.owner)}'s ${atk.type} kills ${pname(def.owner)}'s ${def.type}`, 'combat');
+    defenderHex.unit = null;
+    return 'atk';
+  } else {
+    log(G, `${pname(def.owner)}'s ${def.type} kills ${pname(atk.owner)}'s ${atk.type}`, 'combat');
+    attackerHex.unit = null;
+    return 'def';
+  }
+}
+
+function pname(pid) { return G.players[pid].name; }
+
+// --- Execute move ---
+
+function executeMove(from, to, path = []) {
+  const unit = from.unit;
+  const p = G.players[unit.owner];
+
+  // Conquer tiles passed through (Knight's 2-move claims both hexes)
+  const conquerPath = () => {
+    for (const via of path) {
+      // Don't flip fiefs under enemy holdings we passed — those need siege
+      if (!via.holding || via.holding.owner === unit.owner) {
+        conquer(via, p);
+      }
+    }
+  };
+
+  const enemyHolding = to.holding && to.holding.owner !== unit.owner;
+  const enemyUnit = to.unit && to.unit.owner !== unit.owner;
+
+  // Defended enemy holding: fight the garrison, begin siege if you win.
+  // MUST come before the generic combat case — that case was eating this one
+  // and incorrectly calling conquer() on the holding's fief.
+  if (enemyHolding && enemyUnit) {
+    const result = resolveCombat(from, to);
+    unit.attacked = true; // combat-move consumes ranged attack
+    if (result === 'atk') {
+      to.unit = unit;
+      from.unit = null;
+      unit.moved = true;
+      conquerPath();
+      log(G, `${p.name}'s ${unit.type} breaks the garrison and begins siege (pop ${currentPop(to)})`, 'combat');
+    } else {
+      unit.moved = (result !== 'blocked');
+    }
+    return;
+  }
+
+  // Undefended enemy holding: begin siege (damage ticks at end of round)
+  if (enemyHolding && !to.unit) {
+    if (G.eventFlags.peace) { log(G, 'Peace Treaty: cannot siege'); return; }
+    to.unit = unit;
+    from.unit = null;
+    unit.moved = true;
+    unit.attacked = true;
+    conquerPath();
+    log(G, `${p.name}'s ${unit.type} begins siege of ${pname(to.holding.owner)}'s ${to.holding.type} (pop ${currentPop(to)})`, 'combat');
+    return;
+  }
+
+  // Enemy unit on non-holding tile: open-field combat, conquer the tile if you win
+  if (enemyUnit) {
+    const result = resolveCombat(from, to);
+    unit.attacked = true; // combat-move consumes ranged attack — only empty-tile moves preserve it
+    if (result === 'atk') {
+      to.unit = unit;
+      from.unit = null;
+      unit.moved = true;
+      conquerPath();
+      conquer(to, p);
+    } else {
+      unit.moved = (result !== 'blocked');
+    }
+    return;
+  }
+
+  // Normal move (empty tile, no enemy holding) — bowman keeps its ranged attack
+  to.unit = unit;
+  from.unit = null;
+  unit.moved = true;
+  conquerPath();
+  conquer(to, p);
+}
+
+function conquer(hex, p) {
+  const wasUnclaimed = hex.fief === null;
+  if (hex.fief !== p.id) {
+    hex.fief = p.id;
+    if (wasUnclaimed && p.house.key === 'surveyor') {
+      p.gold += 1;
+      log(G, `Surveyor: ${p.name} +1g for unclaimed tile`);
+    }
+  }
+}
+
+function checkCapture(hex) {
+  if (!hex.holding) return;
+  if (currentPop(hex) > 0) return;
+  const oldOwner = hex.holding.owner;
+  const newOwner = hex.unit ? hex.unit.owner : null;
+  if (newOwner === null) return; // shouldn't happen with melee-on-tile
+
+  log(G, `${pname(newOwner)} CAPTURES ${pname(oldOwner)}'s ${hex.holding.type}!`, 'turn');
+  hex.holding.owner = newOwner;
+  hex.fief = newOwner;
+  G.players[newOwner].capturedHolding = true;
+
+  if (hex.holding.type === 'castle') {
+    eliminatePlayer(G.players[oldOwner]);
+  }
+}
+
+function eliminatePlayer(p) {
+  p.eliminated = true;
+  log(G, `${p.name} is ELIMINATED`, 'turn');
+  // units become neutral (owner = -1), other holdings removed, fiefs become null (unclaimed)
+  G.hexes.forEach(h => {
+    if (h.unit && h.unit.owner === p.id) h.unit.owner = -1; // neutral
+    if (h.holding && h.holding.owner === p.id && h.holding.type !== 'castle') {
+      G.componentsUsed[h.holding.type]--;
+      h.holding = null;
+    }
+    if (h.fief === p.id) h.fief = null;
+  });
+}
+
+// --- Bowman ranged ---
+
+function getBowmanTargets(hex) {
+  if (!hex.unit || hex.unit.type !== 'bowman' || hex.unit.attacked) return [];
+  if (G.eventFlags.fog) return [];
+  const range = G.eventFlags.clearSkies ? 2 : 1;
+  const targets = [];
+  const addTargetsAt = (nh) => {
+    if (!nh) return;
+    const enemyUnit = nh.unit && nh.unit.owner !== hex.unit.owner && nh.unit.owner !== -1;
+    const enemyHolding = nh.holding && nh.holding.owner !== hex.unit.owner;
+    // Enemy holding is always a valid building target — regardless of who (if anyone) is on it.
+    // This lets a bowman choose: shoot the besieger/garrison, or bombard the walls.
+    if (enemyUnit) targets.push({ hex: nh, type: 'unit' });
+    if (enemyHolding) targets.push({ hex: nh, type: 'holding' });
+  };
+  // range 1: adjacent
+  for (const [nq, nr] of neighbors(hex.q, hex.r)) {
+    addTargetsAt(getHex(nq, nr));
+  }
+  if (range === 2) {
+    // straight line through non-blocking
+    for (const [dq, dr] of DIRS) {
+      const m1 = getHex(hex.q + dq, hex.r + dr);
+      if (isImpassable(m1)) continue;
+      addTargetsAt(getHex(hex.q + dq*2, hex.r + dr*2));
+    }
+  }
+  return targets;
+}
+
+function executeBowmanAttack(from, target, targetType) {
+  const unit = from.unit;
+  unit.attacked = true;   // blocks further ranged attacks (same-turn gate)
+  unit.rangedUsed = true; // blocks passive siege contribution (shot is spent)
+  if (G.eventFlags.peace) { log(G, 'Peace Treaty: ranged attack blocked'); return; }
+  if (targetType === 'unit') {
+    resolveCombat(from, target, true);
+  } else if (targetType === 'holding') {
+    target.holding.damage = Math.min(target.holding.damage + 1, HOLDING_TYPES[target.holding.type].pop);
+    log(G, `${pname(unit.owner)}'s Bowman fires on ${pname(target.holding.owner)}'s ${target.holding.type} (pop ${currentPop(target)})`, 'combat');
+    // Bowman doesn't occupy, so capture-at-0 needs an adjacent melee — for now leave at 0, capture when melee arrives
+    if (currentPop(target) === 0 && target.unit && target.unit.owner === unit.owner) {
+      checkCapture(target);
+    } else if (currentPop(target) === 0) {
+      log(G, `${target.holding.type} at 0 — send a unit to capture`);
+    }
+  }
+}
+
+// --- Supply lines ---
+
+function supplyTrace(g, unitHex, player, opts = {}) {
+  // BFS to find shortest valid supply path to a friendly holding.
+  // opts.anchorTypes: which holding types count as endpoints (default: all)
+  // opts.returnPath: also return the path tiles
+  const isQM = player.house.key === 'quartermaster';
+  const passage = player.rightOfPassage;
+  const anchorTypes = opts.anchorTypes || null; // null = any type
+
+  // A holding anchors supply as long as it still belongs to the player —
+  // a siege in progress does NOT cut supply. Only actual capture does.
+  const isAnchor = (h) =>
+    h.holding &&
+    h.holding.owner === player.id &&
+    (!anchorTypes || anchorTypes.includes(h.holding.type));
+
+  const visited = new Set([hexKey(unitHex.q, unitHex.r)]);
+  const cameFrom = {};
+  let frontier = [unitHex];
+  let dist = 0;
+
+  if (isAnchor(unitHex)) {
+    return opts.returnPath ? { cost: 0, path: [unitHex] } : 0;
+  }
+
+  while (frontier.length && dist < 50) {
+    dist++;
+    const next = [];
+    for (const h of frontier) {
+      for (const [nq, nr] of neighbors(h.q, h.r)) {
+        const nh = getHex(nq, nr);
+        if (!nh) continue;
+        const key = hexKey(nq, nr);
+        if (visited.has(key)) continue;
+        if (isImpassable(nh)) continue;
+
+        cameFrom[key] = h;
+
+        // Check for anchor FIRST — a besieged holding still anchors supply
+        // even though an enemy stands on it (tile wouldn't pass canTrace below).
+        if (isAnchor(nh)) {
+          if (opts.returnPath) {
+            const path = [nh];
+            let cur = h;
+            while (cur && cur !== unitHex) {
+              path.push(cur);
+              cur = cameFrom[hexKey(cur.q, cur.r)];
+            }
+            path.push(unitHex);
+            return { cost: dist, path };
+          }
+          return dist;
+        }
+
+        // Supply path traces ONLY through fiefs you own.
+        // Unclaimed tiles block supply just like enemy fiefs.
+        // An enemy unit standing on your fief cuts that tile.
+        // Quartermaster / right-of-passage still allow tracing enemy fiefs.
+        const ownFief = nh.fief === player.id;
+        const enemyFief = nh.fief !== null && nh.fief !== player.id;
+        const enemyOnOwnFief = ownFief && nh.unit && nh.unit.owner !== player.id && nh.unit.owner !== -1;
+
+        let canTrace = false;
+        if (ownFief && !enemyOnOwnFief) canTrace = true;
+        else if (enemyFief && (isQM || passage.has(nh.fief))) canTrace = true;
+        if (!canTrace) continue;
+
+        visited.add(key);
+        next.push(nh);
+      }
+    }
+    frontier = next;
+  }
+  return opts.returnPath ? { cost: Infinity, path: [] } : Infinity;
+}
+
+// Supply COST: distance to nearest holding of ANY type (outposts count here)
+function supplyCost(g, unitHex, player, returnPath = false) {
+  return supplyTrace(g, unitHex, player, { returnPath });
+}
+
+// Survival check: needs path to Castle OR Village. Outpost alone = dead.
+function hasSupplyAnchor(g, unitHex, player) {
+  return supplyTrace(g, unitHex, player, { anchorTypes: ['castle', 'village'] }) !== Infinity;
+}
+
+function isBesieged(g, hex) {
+  // A holding is besieged if an enemy unit is on it (melee siege)
+  if (!hex.holding) return false;
+  if (hex.unit && hex.unit.owner !== hex.holding.owner && hex.unit.owner !== -1) return true;
+  return false;
+}
+
+function checkSupplyCutoff(g) {
+  // Immediate death for any unit with no supply path to a Castle or Village.
+  // Outposts reduce supply COST but do NOT prevent cutoff death.
+  // Called after each player's Act.
+  let humanUnitDied = false;
+  g.hexes.forEach(h => {
+    if (!h.unit || h.unit.owner < 0) return; // skip neutrals
+    const p = g.players[h.unit.owner];
+    if (p.eliminated) return;
+    if (!hasSupplyAnchor(g, h, p)) {
+      // Tell the player what it COULD reach (usually an outpost, or nothing at all)
+      const costToAny = supplyCost(g, h, p);
+      const detail = costToAny === Infinity
+        ? ' (no friendly holding reachable)'
+        : ` (only reaches an outpost — needs castle/village)`;
+      log(g, `💀 ${p.name}'s ${h.unit.type} at (${h.q},${h.r}) CUT OFF${detail} — dies`, 'combat');
+      console.log('[SUPPLY CUTOFF]', p.name, h.unit.type, `at (${h.q},${h.r})`, detail);
+      if (!p.ai) humanUnitDied = true;
+      h.unit = null;
+    }
+  });
+  if (humanUnitDied) g._pauseAI = true; // let the human see what happened
+}
+
+// --- Building validation ---
+
+function canBuildHolding(g, hex, player, type) {
+  const cost = holdingCost(g, player, type);
+  if (player.gold < cost) return { ok: false, why: `Need ${cost}g` };
+  if (g.componentsUsed[type] >= COMPONENT_LIMITS[type]) return { ok: false, why: `No ${type}s left` };
+
+  if (type === 'village') {
+    // Villages can ONLY be built as an upgrade from an outpost
+    if (!hex.holding || hex.holding.type !== 'outpost' || hex.holding.owner !== player.id) {
+      return { ok: false, why: 'Select your outpost to upgrade' };
+    }
+    if (isBesieged(g, hex)) return { ok: false, why: 'Outpost is under siege' };
+    return { ok: true, cost, upgrade: true };
+  }
+
+  // Outpost: standard build rules
+  if (hex.fief !== player.id) return { ok: false, why: 'Not your fief' };
+  if (hex.holding) return { ok: false, why: 'Already a holding here' };
+  if (!hex.unit || hex.unit.owner !== player.id) return { ok: false, why: 'Need your unit on this fief' };
+  // spacing: no holding within 1 tile
+  for (const [nq, nr] of neighbors(hex.q, hex.r)) {
+    const nh = getHex(nq, nr);
+    if (nh && nh.holding) return { ok: false, why: 'Too close to another holding' };
+  }
+  return { ok: true, cost };
+}
+
+function getUnitSpawns(g, player) {
+  // All holdings where a unit could appear: castle, village, or outpost
+  // Not blocked by own unit. Besieged holdings ARE valid (sally-out combat).
+  return g.hexes.filter(h =>
+    h.holding &&
+    h.holding.owner === player.id &&
+    !(h.unit && h.unit.owner === player.id)
+  );
+}
+
+function canBuildUnit(g, player, type) {
+  if (player.unitBuiltThisRound) return { ok: false, why: 'Already built a unit this round' };
+  const cost = unitCost(g, type);
+  if (player.gold < cost) return { ok: false, why: `Need ${cost}g` };
+  const spawns = getUnitSpawns(g, player);
+  if (!spawns.length) return { ok: false, why: 'No open holding to recruit at' };
+  return { ok: true, cost, spawns };
+}
+
+function buildUnit(g, player, type, spawnHex) {
+  // Re-validate at click-time to avoid stale-state bugs
+  const cost = unitCost(g, type);
+  if (player.unitBuiltThisRound || player.gold < cost) return;
+  if (!spawnHex.holding || spawnHex.holding.owner !== player.id) return;
+  if (spawnHex.unit && spawnHex.unit.owner === player.id) return;
+
+  player.gold -= cost;
+  player.unitBuiltThisRound = true;
+  const newUnit = { type, owner: player.id, moved: true, attacked: true };
+
+  // Fresh check: is there an enemy on this holding right now?
+  const besieger = (spawnHex.unit && spawnHex.unit.owner !== player.id) ? spawnHex.unit : null;
+
+  if (besieger) {
+    log(g, `${player.name} trains a ${type} at their ${spawnHex.holding.type} to break the siege!`, 'build');
+    const beats = UNIT_TYPES[type].beats === besieger.type;
+    const loses = UNIT_TYPES[besieger.type].beats === type;
+    if (beats) {
+      log(g, `The ${type} drives off the besieging ${besieger.type}`, 'combat');
+      spawnHex.unit = newUnit;
+    } else if (loses) {
+      log(g, `The besieging ${besieger.type} cuts down the fresh ${type}`, 'combat');
+      // besieger stays, new unit dies — gold spent, nothing gained
+    } else {
+      // Same-type tie: BOTH die
+      log(g, `Both the ${type} and besieging ${besieger.type} fall`, 'combat');
+      spawnHex.unit = null;
+    }
+  } else {
+    spawnHex.unit = newUnit;
+    log(g, `${player.name} recruits a ${type} at their ${spawnHex.holding.type}`, 'build');
+  }
+}
+
+// --- Upkeep ---
+
+function collectIncome(g, p) {
+  // Called at START of each player's turn — income before spending
+  let income = calcFees(g, p);
+  if (g.eventFlags.taxRevolt) {
+    // Compute tax revolt targets lazily
+    if (!g.eventFlags.taxRevoltTargets) {
+      let maxF = -1;
+      const alive = g.players.filter(pp => !pp.eliminated);
+      alive.forEach(pp => maxF = Math.max(maxF, calcFees(g, pp)));
+      g.eventFlags.taxRevoltTargets = alive.filter(pp => calcFees(g, pp) === maxF).map(pp => pp.id);
+    }
+    if (g.eventFlags.taxRevoltTargets.includes(p.id)) {
+      income = Math.floor(income / 2);
+      log(g, `Tax Revolt: ${p.name} collects half`);
+    }
+  }
+  if (p.house.key === 'chancellor') income += 2;
+  p.gold += income;
+  return income;
+}
+
+// Pay supply at END OF YOUR TURN — locks in cost before AI can lengthen your routes.
+function paySupply(g, p) {
+  const units = g.hexes.filter(h => h.unit && h.unit.owner === p.id);
+  if (!units.length) return;
+
+  const supplyData = units.map(h => ({ hex: h, cost: supplyCost(g, h, p) }));
+  supplyData.sort((a, b) => a.cost - b.cost); // pay cheap first
+
+  const totalNeeded = supplyData.reduce((s, d) => s + (d.cost === Infinity ? 0 : d.cost), 0);
+  const goldAtStart = p.gold;
+  let paid = 0, deserted = 0;
+
+  for (const { hex, cost } of supplyData) {
+    if (cost === Infinity) {
+      // No holding reachable at all — dies (checkSupplyCutoff catches outpost-only case)
+      log(g, `${p.name}'s ${hex.unit.type} is cut off — dies`, 'combat');
+      hex.unit = null;
+    } else if (p.gold >= cost) {
+      p.gold -= cost;
+      paid += cost;
+    } else {
+      log(g, `${p.name}'s ${hex.unit.type} deserts — need ${cost}g, only ${p.gold}g left`, 'combat');
+      hex.unit = null;
+      deserted++;
+    }
+  }
+
+  if (!p.ai && deserted > 0) {
+    log(g, `  ${p.name} had ${goldAtStart}g, needed ${totalNeeded}g supply → ${deserted} unit(s) deserted`, 'combat');
+    g._pauseAI = true;
+  } else if (paid > 0) {
+    log(g, `${p.name}: −${paid}g supply`);
+  }
+}
+
+function doUpkeep(g) {
+  // Supply is now paid at end of each player's turn, not here.
+  // Upkeep just resets per-round flags.
+  log(g, `— Upkeep —`, 'turn');
+  g.players.forEach(p => {
+    p.unitBuiltThisRound = false;
+    p.rightOfPassage.clear();
+    p._usedRoyalFavor = false;
+  });
+}
+
+// Compute siege pressure on a holding right now:
+//   - Enemy unit ON it (besieger) → +1
+//   - Each adjacent enemy unit → +1, including bowmen...
+//   - ...EXCEPT a bowman that has already fired a ranged shot (u.rangedUsed).
+//     Melee combat does NOT count — a bowman that fought its way to position
+//     still contributes siege pressure; only an explicit ranged attack uses up
+//     their volley.
+// Garrison does NOT shield from adjacent siege. Multi-faction siege works.
+function siegePressure(g, hex) {
+  if (!hex.holding || g.eventFlags.peace) return { dmg: 0, sources: [] };
+  const ownerId = hex.holding.owner;
+  let dmg = 0;
+  const sources = [];
+
+  if (hex.unit && hex.unit.owner !== ownerId && hex.unit.owner !== -1) {
+    dmg++;
+    sources.push(`${hex.unit.type} besieging`);
+  }
+  for (const [nq, nr] of neighbors(hex.q, hex.r)) {
+    const nh = getHex(nq, nr);
+    if (!nh || !nh.unit) continue;
+    const u = nh.unit;
+    if (u.owner === ownerId || u.owner === -1) continue;
+    // Bowmen that already fired a ranged shot don't get a second volley at the walls.
+    // (u.attacked from melee/siege does NOT block this — only explicit fire does.)
+    if (u.type === 'bowman' && u.rangedUsed) continue;
+    dmg++;
+    sources.push(`adj ${u.type}`);
+  }
+  return { dmg, sources };
+}
+
+// End-of-round siege damage — applies siegePressure to every holding.
+function applySiegeDamage(g) {
+  if (g.eventFlags.peace) return;
+  g.hexes.forEach(h => {
+    if (!h.holding) return;
+    const { dmg, sources } = siegePressure(g, h);
+    if (dmg > 0) {
+      const maxPop = HOLDING_TYPES[h.holding.type].pop;
+      h.holding.damage = Math.min(h.holding.damage + dmg, maxPop);
+      log(g, `Siege: ${pname(h.holding.owner)}'s ${h.holding.type} takes ${dmg} dmg (${sources.join(', ')}) → pop ${currentPop(h)}`, 'combat');
+      console.log('[SIEGE]', pname(h.holding.owner), h.holding.type, `-${dmg}`, '→ pop', currentPop(h));
+      checkCapture(h);
+    }
+  });
+}
+
+function doEnd(g) {
+  // Siege damage ticks first
+  applySiegeDamage(g);
+
+  // Heal holdings that aren't besieged (enemy unit on them)
+  g.hexes.forEach(h => {
+    if (h.holding && h.holding.damage > 0) {
+      const besieged = (h.unit && h.unit.owner !== h.holding.owner);
+      if (!besieged) {
+        h.holding.damage = Math.max(0, h.holding.damage - 1);
+      }
+    }
+  });
+
+  // Safety: reconcile holding fiefs. A holding's tile must belong to its owner.
+  // (Guards against any case that flips a fief out from under an uncaptured holding.)
+  g.hexes.forEach(h => {
+    if (h.holding && h.fief !== h.holding.owner) {
+      console.warn('[FIEF REPAIR]', `${h.holding.type} at (${h.q},${h.r}) owner=${h.holding.owner} but fief=${h.fief} — fixing`);
+      h.fief = h.holding.owner;
+    }
+  });
+
+  // Check victory
+  for (const p of g.players) {
+    if (p.eliminated) continue;
+    const pop = totalPop(g, p);
+    const fees = calcFees(g, p);
+    const army = countUnits(g, p.id);
+    if (pop >= WIN.pop) return { winner: p, cond: 'Population', val: pop };
+    if (fees >= WIN.fees) return { winner: p, cond: 'Tax Collected', val: fees };
+    if (army >= WIN.army) return { winner: p, cond: 'Army', val: army };
+  }
+
+  // Fixed turn order — no first-player rotation. If the nominal first player
+  // has been eliminated, skip forward to the next alive seat.
+  g.firstPlayer = 0;
+  while (g.players[g.firstPlayer].eliminated) {
+    g.firstPlayer = (g.firstPlayer + 1) % g.players.length;
+  }
+
+  g.round++;
+  return null;
+}
+
+// ============================================================================
+// AI
+// ============================================================================
+
+function validateCastlePlacement(g, hex) {
+  if (hex.terrain !== 'grass') return { ok: false, why: 'Must be grassland' };
+  if (hex.holding) return { ok: false, why: 'Tile occupied' };
+  const existing = g.hexes.filter(h => h.holding && h.holding.type === 'castle');
+  for (const c of existing) {
+    if (c.tract === hex.tract) return { ok: false, why: 'Another castle on this tract' };
+    if (hexDist(hex, c) < 3) return { ok: false, why: 'Too close to another castle (min 3 hexes)' };
+  }
+  return { ok: true };
+}
+
+function aiPlaceCastle(g, p) {
+  const candidates = g.hexes.filter(h => validateCastlePlacement(g, h).ok);
+  let best = null, bestScore = -Infinity;
+  for (const h of candidates) {
+    let minDist = Infinity;
+    g.hexes.forEach(oh => { if (oh.holding) minDist = Math.min(minDist, hexDist(h, oh)); });
+    let openNeighbors = 0;
+    for (const [nq, nr] of neighbors(h.q, h.r)) { const nh = getHex(nq, nr); if (nh && isPassable(nh)) openNeighbors++; }
+    const score = minDist * 2 + openNeighbors + Math.random();
+    if (score > bestScore) { bestScore = score; best = h; }
+  }
+  // fallback: relax constraints if nothing valid (rare with good tract spacing)
+  if (!best) {
+    const fallback = g.hexes.filter(h => h.terrain === 'grass' && !h.holding);
+    best = fallback[Math.floor(Math.random() * fallback.length)];
+  }
+  return best;
+}
+
+function aiAct(g, p) {
+  // Strategy: expand toward unclaimed, build holdings when affordable, attack if RPS-favorable
+  const myUnits = g.hexes.filter(h => h.unit && h.unit.owner === p.id);
+
+  // Difficulty tuning
+  const diff = g.difficulty || 'medium';
+  const humanIds = new Set(g.players.filter(pp => !pp.ai).map(pp => pp.id));
+  const isHumanTarget = (id) => humanIds.has(id);
+  // Easy: lots of noise + never siege humans. Hard: bonus for attacking humans.
+  const noise = diff === 'easy' ? 8 : diff === 'tutorial' ? 6 : 2;
+  const humanSiegePenalty = (diff === 'easy' || diff === 'tutorial') ? -30 : 0;
+  const humanAggroBonus = diff === 'hard' ? 5 : 0;
+
+  for (const uh of myUnits) {
+    if (uh.unit.moved) continue;
+    const moves = getValidMoves(uh);
+    if (!moves.length) continue;
+
+    // Score moves
+    let best = null, bestScore = -Infinity;
+    for (const m of moves) {
+      let score = 0;
+      if (m.hex.fief === null) score += 10; // unclaimed
+      if (m.hex.fief !== null && m.hex.fief !== p.id) {
+        score += 6; // flip enemy
+        if (isHumanTarget(m.hex.fief)) score += humanAggroBonus;
+      }
+      // Knight pass-through value
+      if (m.path) {
+        for (const via of m.path) {
+          if (via.fief === null) score += 6;
+          else if (via.fief !== p.id) score += 4;
+        }
+      }
+      if (m.combat) {
+        const def = m.hex.unit;
+        if (UNIT_TYPES[uh.unit.type].beats === def.type) score += 15;
+        else if (UNIT_TYPES[def.type].beats === uh.unit.type) score -= 20;
+        else score -= 5; // tie = both die
+        if (isHumanTarget(def.owner)) score += humanAggroBonus;
+      }
+      if (m.siege) {
+        score += 8;
+        if (m.hex.holding && isHumanTarget(m.hex.holding.owner)) {
+          score += humanSiegePenalty; // easy/tutorial AI leaves human holdings alone
+          score += humanAggroBonus;    // hard AI hunts them
+        }
+      }
+      // prefer moves that keep supply cheap and anchored
+      const sc = supplyCost(g, m.hex, p);
+      score -= sc * 2;
+      if (sc === Infinity) score -= 50;
+      if (!hasSupplyAnchor(g, m.hex, p)) score -= 100; // would die at end of turn
+      score += Math.random() * noise;
+      if (score > bestScore) { bestScore = score; best = m; }
+    }
+    if (best && bestScore > -10) {
+      executeMove(uh, best.hex, best.path);
+    } else {
+      uh.unit.moved = true; // skip
+    }
+  }
+
+  // Bowman ranged
+  const bowmen = g.hexes.filter(h => h.unit && h.unit.owner === p.id && h.unit.type === 'bowman' && !h.unit.attacked);
+  for (const bh of bowmen) {
+    const targets = getBowmanTargets(bh);
+    // Prefer spearmen (clean kill), then holdings, then bowmen (trade)
+    const spearTargets = targets.filter(t => t.type === 'unit' && t.hex.unit.type === 'spearman');
+    const holdTargets = targets.filter(t => t.type === 'holding');
+    const bowTargets = targets.filter(t => t.type === 'unit' && t.hex.unit.type === 'bowman');
+    const pick = spearTargets[0] || holdTargets[0] || bowTargets[0];
+    if (pick) executeBowmanAttack(bh, pick.hex, pick.type);
+  }
+}
+
+function aiSpend(g, p) {
+  const fees = calcFees(g, p);
+  const pop = totalPop(g, p);
+  const army = countUnits(g, p.id);
+
+  // Reserve gold for supply — paid at end of turn, AFTER spending.
+  // Fresh recruit is moved:true so it stays on its spawn (cost 0) this turn.
+  let supplyReserve = 0;
+  g.hexes.forEach(h => {
+    if (h.unit && h.unit.owner === p.id) {
+      const c = supplyCost(g, h, p);
+      if (c !== Infinity) supplyReserve += c;
+    }
+  });
+  const canSpend = Math.max(0, p.gold - supplyReserve);
+
+  // Closest win condition drives spend
+  const popGap = WIN.pop - pop;
+  const feesGap = WIN.fees - fees;
+  const armyGap = WIN.army - army;
+
+  // Priority 1: upgrade an outpost to village (big pop jump, supply anchor)
+  if ((popGap < armyGap || feesGap < armyGap) && canSpend >= holdingCost(g, p, 'village')) {
+    const upgradable = g.hexes.filter(h => canBuildHolding(g, h, p, 'village').ok);
+    if (upgradable.length) {
+      // Prefer the outpost furthest from castle (extends supply reach)
+      const castle = g.hexes.find(h => h.holding && h.holding.type === 'castle' && h.holding.owner === p.id);
+      let target = upgradable[0];
+      if (castle) {
+        let best = -1;
+        for (const h of upgradable) { const d = hexDist(h, castle); if (d > best) { best = d; target = h; }}
+      }
+      const res = canBuildHolding(g, target, p, 'village');
+      p.gold -= res.cost;
+      g.componentsUsed.outpost--;
+      const dmg = target.holding.damage || 0;
+      target.holding = { type: 'village', owner: p.id, damage: dmg };
+      g.componentsUsed.village++;
+      log(g, `${p.name} upgrades an Outpost to a Village`, 'build');
+      return;
+    }
+  }
+
+  // Priority 2: build a new outpost
+  if ((popGap < armyGap || feesGap < armyGap) && canSpend >= holdingCost(g, p, 'outpost')) {
+    const candidates = g.hexes.filter(h => canBuildHolding(g, h, p, 'outpost').ok);
+    if (candidates.length) {
+      const target = candidates[Math.floor(Math.random() * candidates.length)];
+      const res = canBuildHolding(g, target, p, 'outpost');
+      p.gold -= res.cost;
+      target.holding = { type: 'outpost', owner: p.id, damage: 0 };
+      g.componentsUsed.outpost++;
+      log(g, `${p.name} builds an Outpost`, 'build');
+      return;
+    }
+  }
+
+  // Priority 3: build a unit
+  if (!p.unitBuiltThisRound) {
+    let type = army < 3 ? 'spearman' : (army % 3 === 0 ? 'knight' : army % 3 === 1 ? 'bowman' : 'spearman');
+    const spawns = getUnitSpawns(g, p);
+    if (!spawns.length) return;
+
+    // Find any besieged spawn — if so, build the RPS counter there
+    const besieged = spawns.find(h => h.unit && h.unit.owner !== p.id);
+    let spawnAt;
+    if (besieged) {
+      const besiegerType = besieged.unit.type;
+      for (const [t, def] of Object.entries(UNIT_TYPES)) {
+        if (def.beats === besiegerType) { type = t; break; }
+      }
+      spawnAt = besieged;
+    } else {
+      // Prefer castle, else village, else outpost
+      spawnAt = spawns.find(h => h.holding.type === 'castle')
+             || spawns.find(h => h.holding.type === 'village')
+             || spawns[0];
+    }
+
+    // If besieged, spend even into supply reserve — siege-break is life or death
+    const budget = besieged ? p.gold : canSpend;
+    if (budget >= unitCost(g, type)) {
+      buildUnit(g, p, type, spawnAt);
+    }
+  }
+}
+
+function aiPickDisbandVictim(g, p, units) {
+  // disband furthest from holdings
+  let worst = units[0], worstCost = -1;
+  for (const u of units) {
+    const c = supplyCost(g, u, p);
+    if (c > worstCost) { worstCost = c; worst = u; }
+  }
+  worst._lastUnitType = worst.unit.type;
+  return worst;
+}
+
+// ============================================================================
+// GAME LOOP
+// ============================================================================
+
+function advancePhase() {
+  if (G.phase === 'setup-castle') {
+    // Reverse order — last player placed first, now count down to P0
+    G.turn--;
+    if (G.turn < 0) {
+      // All castles placed — place starting spearmen & fiefs
+      G.players.forEach(p => {
+        const castle = G.hexes.find(h => h.holding && h.holding.type === 'castle' && h.holding.owner === p.id);
+        castle.fief = p.id;
+        castle.unit = { type: 'spearman', owner: p.id, moved: false, attacked: false };
+        if (p.house.key === 'marshal') {
+          // place 2nd spearman adjacent if possible
+          for (const [nq, nr] of neighbors(castle.q, castle.r)) {
+            const nh = getHex(nq, nr);
+            if (nh && isPassable(nh) && !nh.unit) {
+              nh.unit = { type: 'spearman', owner: p.id, moved: false, attacked: false };
+              nh.fief = p.id;
+              break;
+            }
+          }
+        }
+      });
+      log(G, `=== ROUND 1 ===`, 'turn');
+      G.phase = 'act';
+      G.turn = G.firstPlayer;
+      startPlayerTurn(G, G.players[G.turn]);
+    }
+  } else if (G.phase === 'act') {
+    // End of this player's turn: pay supply now (locks in cost before AI can interfere)
+    const endingPlayer = G.players[G.turn];
+    if (!endingPlayer.eliminated) paySupply(G, endingPlayer);
+    // Supply cutoff check — any unit with no castle/village path dies NOW
+    checkSupplyCutoff(G);
+    // Next player
+    let next = (G.turn + 1) % G.players.length;
+    let loops = 0;
+    while (G.players[next].eliminated && loops < G.players.length) { next = (next + 1) % G.players.length; loops++; }
+
+    if (next === G.firstPlayer || loops >= G.players.length) {
+      // All players acted — upkeep
+      G.phase = 'upkeep';
+      doUpkeep(G);
+      G.phase = 'end';
+      const victory = doEnd(G);
+      if (victory) {
+        showVictory(victory);
+        G.phase = 'over';
+        return;
+      }
+      // Reset round
+      G.hexes.forEach(h => { if (h.unit) { h.unit.moved = false; h.unit.attacked = false; h.unit.rangedUsed = false; }});
+      G.eventFlags = {};
+      G.currentEvent = null;
+      log(G, `=== ROUND ${G.round} ===`, 'turn');
+
+      // Draw event (round 2+)
+      if (G.round >= 2) {
+        if (!G.eventDeck.length) { G.eventDeck = [...G.eventDiscard]; G.eventDiscard = []; shuffle(G.eventDeck); }
+        G.currentEvent = G.eventDeck.pop();
+        G.eventDiscard.push(G.currentEvent);
+        log(G, `Event: ${G.currentEvent.name} — ${G.currentEvent.effect}`, 'turn');
+        if (G.currentEvent.flag) G.eventFlags[G.currentEvent.flag] = true;
+        if (G.currentEvent.resolve) G.currentEvent.resolve(G);
+        // Royal Favor target
+        if (G.eventFlags.royalFavor) {
+          let minF = Infinity, targets = [];
+          G.players.forEach(p => { if (!p.eliminated) { const f = calcFees(G, p); if (f < minF) { minF = f; targets = [p.id]; } else if (f === minF) targets.push(p.id); }});
+          G.eventFlags.royalFavorTarget = targets[0]; // simplified: first tied
+        }
+      }
+      G.phase = 'act';
+      G.turn = G.firstPlayer;
+      startPlayerTurn(G, G.players[G.turn]);
+    } else {
+      G.turn = next;
+      startPlayerTurn(G, G.players[G.turn]);
+    }
+  }
+}
+
+function startPlayerTurn(g, p) {
+  // Collect income at the start of YOUR turn (so humans have gold to buy during Act)
+  const income = collectIncome(g, p);
+  log(g, `${p.name}'s turn — collects ${income}g`, 'turn');
+}
+
+function maybeRunAI() {
+  const p = G.players[G.turn];
+  if (!p || p.eliminated || !p.ai || G.phase === 'over') return;
+
+  // Slow down if a human unit just died — give them time to read the log
+  const delay = G._pauseAI ? 2500 : 400;
+  if (G._pauseAI) {
+    G._pauseAI = false;
+    log(G, `⏸ (paused 2.5s — check the log above)`, 'turn');
+    render();
+  }
+
+  setTimeout(() => {
+    if (G.phase === 'setup-castle') {
+      const h = aiPlaceCastle(G, p);
+      h.holding = { type: 'castle', owner: p.id, damage: 0 };
+      log(G, `${p.name} places castle at (${h.q},${h.r})`);
+      advancePhase();
+      render();
+      maybeRunAI();
+    } else if (G.phase === 'act') {
+      aiAct(G, p);   // move units
+      aiSpend(G, p); // then build (same timing as humans)
+      advancePhase(); // paySupply + checkSupplyCutoff happen here
+      render();
+      maybeRunAI();
+    }
+  }, delay);
+}
+
+// ============================================================================
+// UI / RENDERING
+// ============================================================================
+
+const SVG_NS = 'http://www.w3.org/2000/svg';
+
+// Tutorial trigger check — evaluates game state and queues up the next
+// relevant hint card. Only one card shown at a time; subsequent triggers
+// wait until the player dismisses the current card.
+function checkTutorialTriggers() {
+  if (!G || G.difficulty !== 'tutorial' || G.tutorialSkipped) return;
+  // Don't stack cards — wait for dismissal
+  if (document.getElementById('tutorial-card').style.display === 'block') return;
+
+  const human = G.players.find(p => !p.ai);
+  if (!human) return;
+  const isHumanTurn = G.turn === human.id;
+
+  // Ordered by likely appearance in a normal game
+  if (G.phase === 'setup-castle' && isHumanTurn) {
+    showTutorial('welcome');
+    return;
+  }
+
+  if (G.phase === 'act' && isHumanTurn && G.round === 1) {
+    showTutorial('firstTurn');
+    return;
+  }
+
+  if (G.phase === 'act' && isHumanTurn) {
+    // Houses — show once player has had a moment
+    if (G.round === 1 && !G.tutorialShown.has('firstTurn')) return; // wait
+    showTutorial('houses');
+
+    // Movement tip (after they've entered move mode at least once)
+    if (G.mode === 'move') { showTutorial('movement'); return; }
+
+    // Supply tip — when they have a unit off the castle
+    const unitsOffHolding = G.hexes.some(h =>
+      h.unit && h.unit.owner === human.id && supplyCost(G, h, human) > 0
+    );
+    if (unitsOffHolding) { showTutorial('supply'); return; }
+
+    // Building tip — when they can afford an outpost
+    if (human.gold >= 20 && G.round >= 2) { showTutorial('building'); return; }
+
+    // Bowman tip — when they have an unattacked bowman
+    const hasBowman = G.hexes.some(h =>
+      h.unit && h.unit.owner === human.id && h.unit.type === 'bowman' && !h.unit.attacked
+    );
+    if (hasBowman) { showTutorial('bowman'); return; }
+
+    // Siege tip — when they're adjacent to or on an enemy holding
+    const sieging = G.hexes.some(h => {
+      if (!h.unit || h.unit.owner !== human.id) return false;
+      if (h.holding && h.holding.owner !== human.id) return true; // on it
+      for (const [nq, nr] of neighbors(h.q, h.r)) {
+        const nh = getHex(nq, nr);
+        if (nh && nh.holding && nh.holding.owner !== human.id) return true;
+      }
+      return false;
+    });
+    if (sieging) { showTutorial('siege'); return; }
+
+    // Combat tip — any enemy unit adjacent to human's
+    const enemyAdj = G.hexes.some(h => {
+      if (!h.unit || h.unit.owner !== human.id) return false;
+      for (const [nq, nr] of neighbors(h.q, h.r)) {
+        const nh = getHex(nq, nr);
+        if (nh && nh.unit && nh.unit.owner !== human.id && nh.unit.owner !== -1) return true;
+      }
+      return false;
+    });
+    if (enemyAdj) { showTutorial('combat'); return; }
+
+    // End turn tip — once they've done SOMETHING
+    const hasMoved = G.hexes.some(h => h.unit && h.unit.owner === human.id && h.unit.moved);
+    if (hasMoved) { showTutorial('endTurn'); return; }
+  }
+}
+
+function render() {
+  renderBoard();
+  renderPlayers();
+  renderSidebar();
+  renderHeader();
+  renderProgress();
+  checkTutorialTriggers();
+}
+
+function renderProgress() {
+  const bar = document.getElementById('progress-bar');
+  bar.innerHTML = '';
+  if (!G || G.phase === 'setup-castle') { bar.innerHTML = '<span style="font-size:11px;color:var(--text-dim)">Win progress will appear here</span>'; return; }
+
+  G.players.forEach(p => {
+    const pop = totalPop(G, p);
+    const fees = calcFees(G, p);
+    const army = countUnits(G, p.id);
+    const pct = (v, max) => Math.min(100, (v / max) * 100);
+
+    const div = document.createElement('div');
+    div.className = 'prog-player' + (G.turn === p.id ? ' active' : '') + (p.eliminated ? ' eliminated' : '');
+    div.innerHTML = `
+      <div class="prog-name"><span class="color-dot" style="background:${p.color};width:8px;height:8px"></span>${p.name}</div>
+      <div class="prog-row">
+        <span class="prog-label">Pop</span>
+        <div class="prog-track"><div class="prog-fill ${pop >= WIN.pop ? 'win' : ''}" style="width:${pct(pop, WIN.pop)}%;background:${p.color}"></div></div>
+        <span class="prog-val">${pop}/${WIN.pop}</span>
+      </div>
+      <div class="prog-row">
+        <span class="prog-label">Tax</span>
+        <div class="prog-track"><div class="prog-fill ${fees >= WIN.fees ? 'win' : ''}" style="width:${pct(fees, WIN.fees)}%;background:${p.color}"></div></div>
+        <span class="prog-val">${fees}/${WIN.fees}</span>
+      </div>
+      <div class="prog-row">
+        <span class="prog-label">Army</span>
+        <div class="prog-track"><div class="prog-fill ${army >= WIN.army ? 'win' : ''}" style="width:${pct(army, WIN.army)}%;background:${p.color}"></div></div>
+        <span class="prog-val">${army}/${WIN.army}</span>
+      </div>
+    `;
+    bar.appendChild(div);
+  });
+}
+
+function renderHeader() {
+  const p = G.players[G.turn];
+  const phaseText = G.phase === 'setup-castle' ? `Setup — ${p.name} place castle`
+    : G.phase === 'act' ? `Round ${G.round} — ${p.name}'s turn`
+    : G.phase === 'over' ? 'Game Over'
+    : G.phase;
+  document.getElementById('phase-display').innerHTML = `<strong>${phaseText}</strong>`;
+  document.getElementById('btn-end-turn').disabled = G.phase !== 'act' || p.ai;
+}
+
+function renderBoard() {
+  const svg = document.getElementById('board');
+  // Preserve defs, remove everything else
+  const defs = svg.querySelector('defs');
+  svg.innerHTML = '';
+  if (defs) svg.appendChild(defs);
+
+  // viewBox auto-fits all hexes to the viewport
+  const bounds = getBounds();
+  const pad = 60;
+  svg.setAttribute('viewBox', `${bounds.minX - pad} ${bounds.minY - pad} ${bounds.maxX - bounds.minX + pad*2} ${bounds.maxY - bounds.minY + pad*2}`);
+  svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+
+  const gRoot = document.createElementNS(SVG_NS, 'g');
+
+  // Compute supply path for selected unit
+  let supplyPath = null;
+  if (G.selected && G.selected.unit && G.selected.unit.owner >= 0) {
+    const owner = G.players[G.selected.unit.owner];
+    const result = supplyCost(G, G.selected, owner, true);
+    supplyPath = result.path || [];
+  }
+  const supplyPathSet = new Set((supplyPath || []).map(h => hexKey(h.q, h.r)));
+
+  // Hexes
+  G.hexes.forEach(hex => {
+    const { x, y } = hexToPixel(hex.q, hex.r);
+    const g = document.createElementNS(SVG_NS, 'g');
+    g.setAttribute('transform', `translate(${x},${y})`);
+
+    const poly = document.createElementNS(SVG_NS, 'polygon');
+    const points = [];
+    for (let i = 0; i < 6; i++) {
+      const angle = Math.PI / 3 * i + Math.PI / 6;
+      points.push(`${HEX_SIZE * Math.cos(angle)},${HEX_SIZE * Math.sin(angle)}`);
+    }
+    poly.setAttribute('points', points.join(' '));
+    poly.classList.add('hex', hex.terrain);
+    if (G.selected === hex) poly.classList.add('selected');
+    if (G.validMoves && G.validMoves.some(m => m.hex === hex)) {
+      const mv = G.validMoves.find(m => m.hex === hex);
+      poly.classList.add(mv.combat ? 'attackable' : 'movable');
+    }
+    if (G.validTargets && G.validTargets.some(t => t.hex === hex)) poly.classList.add('attackable');
+    if (supplyPathSet.has(hexKey(hex.q, hex.r))) poly.classList.add('supply-path');
+
+    poly.addEventListener('click', () => onHexClick(hex));
+    poly.addEventListener('mouseenter', (e) => showTooltip(hex, e));
+    poly.addEventListener('mouseleave', hideTooltip);
+    g.appendChild(poly);
+
+    // Terrain icons
+    if (hex.terrain === 'forest' || hex.terrain === 'mountain' || hex.terrain === 'lake') {
+      const icon = document.createElementNS(SVG_NS, 'text');
+      icon.setAttribute('text-anchor', 'middle');
+      icon.setAttribute('y', 5);
+      icon.classList.add('terrain-icon');
+      if (hex.terrain === 'lake') icon.setAttribute('opacity', '0.5');
+      icon.textContent = hex.terrain === 'forest' ? '🌲' : hex.terrain === 'mountain' ? '⛰️' : '🌊';
+      g.appendChild(icon);
+    }
+
+    // Rivers
+    if (hex.rivers && hex.rivers.length) {
+      hex.rivers.forEach(d => {
+        const a1 = Math.PI / 3 * d + Math.PI / 6;
+        const a2 = Math.PI / 3 * (d + 1) + Math.PI / 6;
+        const line = document.createElementNS(SVG_NS, 'line');
+        line.setAttribute('x1', HEX_SIZE * Math.cos(a1));
+        line.setAttribute('y1', HEX_SIZE * Math.sin(a1));
+        line.setAttribute('x2', HEX_SIZE * Math.cos(a2));
+        line.setAttribute('y2', HEX_SIZE * Math.sin(a2));
+        line.classList.add('river');
+        g.appendChild(line);
+      });
+    }
+
+    // Fief overlay — vivid color with territorial borders
+    if (hex.fief !== null) {
+      const fief = document.createElementNS(SVG_NS, 'polygon');
+      fief.setAttribute('points', points.join(' '));
+      fief.setAttribute('transform', 'scale(0.92)');
+      fief.setAttribute('fill', COLORS[hex.fief]);
+      fief.classList.add('fief');
+      g.appendChild(fief);
+
+      // Draw thick border on edges facing non-owned territory
+      for (let d = 0; d < 6; d++) {
+        const [dq, dr] = DIRS[d];
+        const nh = getHex(hex.q + dq, hex.r + dr);
+        if (!nh || nh.fief !== hex.fief) {
+          const a1 = Math.PI / 3 * d + Math.PI / 6;
+          const a2 = Math.PI / 3 * (d + 1) + Math.PI / 6;
+          const border = document.createElementNS(SVG_NS, 'line');
+          border.setAttribute('x1', HEX_SIZE * 0.92 * Math.cos(a1));
+          border.setAttribute('y1', HEX_SIZE * 0.92 * Math.sin(a1));
+          border.setAttribute('x2', HEX_SIZE * 0.92 * Math.cos(a2));
+          border.setAttribute('y2', HEX_SIZE * 0.92 * Math.sin(a2));
+          border.setAttribute('stroke', COLORS[hex.fief]);
+          border.classList.add('fief-border');
+          g.appendChild(border);
+        }
+      }
+    }
+
+    // Holding
+    if (hex.holding) {
+      const h = hex.holding;
+      const holdG = document.createElementNS(SVG_NS, 'g');
+      holdG.classList.add('holding');
+      const ownerColor = h.owner >= 0 ? COLORS[h.owner] : '#666';
+
+      if (h.type === 'castle') {
+        // Castle: turreted square
+        const base = document.createElementNS(SVG_NS, 'rect');
+        base.setAttribute('x', -13); base.setAttribute('y', -8);
+        base.setAttribute('width', 26); base.setAttribute('height', 18);
+        base.setAttribute('fill', ownerColor);
+        base.setAttribute('stroke', '#000'); base.setAttribute('stroke-width', 1.5);
+        holdG.appendChild(base);
+        // Turrets
+        for (const tx of [-11, 0, 11]) {
+          const t = document.createElementNS(SVG_NS, 'rect');
+          t.setAttribute('x', tx - 3); t.setAttribute('y', -14);
+          t.setAttribute('width', 6); t.setAttribute('height', 6);
+          t.setAttribute('fill', ownerColor);
+          t.setAttribute('stroke', '#000'); t.setAttribute('stroke-width', 1.5);
+          holdG.appendChild(t);
+        }
+      } else if (h.type === 'village') {
+        // Village: house with peaked roof
+        const roof = document.createElementNS(SVG_NS, 'polygon');
+        roof.setAttribute('points', '-12,-2 0,-14 12,-2');
+        roof.setAttribute('fill', ownerColor);
+        roof.setAttribute('stroke', '#000'); roof.setAttribute('stroke-width', 1.5);
+        holdG.appendChild(roof);
+        const wall = document.createElementNS(SVG_NS, 'rect');
+        wall.setAttribute('x', -10); wall.setAttribute('y', -2);
+        wall.setAttribute('width', 20); wall.setAttribute('height', 12);
+        wall.setAttribute('fill', ownerColor);
+        wall.setAttribute('stroke', '#000'); wall.setAttribute('stroke-width', 1.5);
+        holdG.appendChild(wall);
+      } else {
+        // Outpost: tent/triangle
+        const tent = document.createElementNS(SVG_NS, 'polygon');
+        tent.setAttribute('points', '-9,8 0,-10 9,8');
+        tent.setAttribute('fill', ownerColor);
+        tent.setAttribute('stroke', '#000'); tent.setAttribute('stroke-width', 1.5);
+        holdG.appendChild(tent);
+        const flag = document.createElementNS(SVG_NS, 'polygon');
+        flag.setAttribute('points', '0,-10 0,-16 6,-13');
+        flag.setAttribute('fill', '#fff');
+        flag.setAttribute('stroke', '#000'); flag.setAttribute('stroke-width', 1);
+        holdG.appendChild(flag);
+      }
+
+      // Health badge — always visible, X/Y format, centered above the building icon
+      const maxPop = HOLDING_TYPES[h.type].pop;
+      const pop = currentPop(hex);
+      const hp = document.createElementNS(SVG_NS, 'text');
+      hp.setAttribute('x', 0); hp.setAttribute('y', -20);
+      hp.setAttribute('text-anchor', 'middle');
+      hp.setAttribute('font-size', '9'); hp.setAttribute('font-weight', 'bold');
+      hp.setAttribute('fill', '#fff');
+      hp.setAttribute('stroke', h.damage > 0 ? '#e5534b' : '#2a2a2a');
+      hp.setAttribute('stroke-width', 2.5);
+      hp.setAttribute('paint-order', 'stroke');
+      hp.textContent = `${pop}/${maxPop}`;
+      hp.classList.add('damage-badge');
+      holdG.appendChild(hp);
+
+      // Siege + heal indicators — combined into one line below the building.
+      // Heal shows when the building can regenerate AND there's a reason to show
+      // it: either it's already damaged, or siege will damage it this round
+      // (shows the offset so players understand why 5/5 stays 5/5 despite 🔥).
+      const sp = siegePressure(G, hex);
+      const besieged = hex.unit && hex.unit.owner !== h.owner && hex.unit.owner !== -1;
+      const willHeal = !besieged && (h.damage > 0 || sp.dmg > 0);
+      if (sp.dmg > 0 || willHeal) {
+        const status = document.createElementNS(SVG_NS, 'text');
+        status.setAttribute('x', 0); status.setAttribute('y', 22);
+        status.setAttribute('text-anchor', 'middle');
+        status.setAttribute('font-size', '9'); status.setAttribute('font-weight', 'bold');
+        status.setAttribute('stroke', '#000'); status.setAttribute('stroke-width', 2);
+        status.setAttribute('paint-order', 'stroke');
+
+        const parts = [];
+        if (sp.dmg > 0) parts.push(`🔥-${sp.dmg}`);
+        if (willHeal) parts.push('♥+1');
+        status.textContent = parts.join(' ');
+        // Color: red if net damage, green if net heal, orange if even
+        const net = (willHeal ? 1 : 0) - sp.dmg;
+        status.setAttribute('fill', net < 0 ? '#ff6b35' : net > 0 ? '#4caf50' : '#ffc107');
+        holdG.appendChild(status);
+      }
+      g.appendChild(holdG);
+    }
+
+    // Unit
+    if (hex.unit) {
+      const u = hex.unit;
+      const unitG = document.createElementNS(SVG_NS, 'g');
+      unitG.classList.add('unit');
+      unitG.setAttribute('transform', hex.holding ? 'translate(12,-10)' : '');
+      const color = u.owner >= 0 ? COLORS[u.owner] : '#999';
+
+      // Supply status indicator (for owned units)
+      // Red dashed = will die (no castle/village anchor). Orange = expensive supply.
+      if (u.owner >= 0 && G.phase === 'act') {
+        const owner = G.players[u.owner];
+        const anchored = hasSupplyAnchor(G, hex, owner);
+        const sc = supplyCost(G, hex, owner);
+        if (!anchored) {
+          const ring = document.createElementNS(SVG_NS, 'circle');
+          ring.setAttribute('r', 15);
+          ring.setAttribute('fill', 'none');
+          ring.setAttribute('stroke', '#e5534b');
+          ring.setAttribute('stroke-width', 2.5);
+          ring.setAttribute('stroke-dasharray', '4 3');
+          ring.setAttribute('opacity', '0.9');
+          unitG.appendChild(ring);
+        } else if (sc >= 4) {
+          const ring = document.createElementNS(SVG_NS, 'circle');
+          ring.setAttribute('r', 14);
+          ring.setAttribute('fill', 'none');
+          ring.setAttribute('stroke', '#ff9800');
+          ring.setAttribute('stroke-width', 2);
+          ring.setAttribute('opacity', '0.6');
+          unitG.appendChild(ring);
+        }
+      }
+
+      if (u.type === 'spearman') {
+        const shape = document.createElementNS(SVG_NS, 'polygon');
+        shape.setAttribute('points', '0,-10 9,8 -9,8');
+        shape.setAttribute('fill', color);
+        shape.classList.add('unit-shape');
+        unitG.appendChild(shape);
+      } else if (u.type === 'bowman') {
+        const shape = document.createElementNS(SVG_NS, 'circle');
+        shape.setAttribute('r', 9);
+        shape.setAttribute('fill', color);
+        shape.classList.add('unit-shape');
+        unitG.appendChild(shape);
+      } else {
+        const shape = document.createElementNS(SVG_NS, 'polygon');
+        shape.setAttribute('points', '0,-11 11,0 0,11 -11,0');
+        shape.setAttribute('fill', color);
+        shape.classList.add('unit-shape');
+        unitG.appendChild(shape);
+      }
+      if (u.moved) unitG.setAttribute('opacity', '0.5');
+      g.appendChild(unitG);
+    }
+
+    gRoot.appendChild(g);
+  });
+
+  // Draw supply path as a connected line
+  if (supplyPath && supplyPath.length > 1) {
+    const line = document.createElementNS(SVG_NS, 'polyline');
+    const pts = supplyPath.map(h => { const p = hexToPixel(h.q, h.r); return `${p.x},${p.y}`; }).join(' ');
+    line.setAttribute('points', pts);
+    line.classList.add('supply-line');
+    gRoot.appendChild(line);
+  }
+
+  svg.appendChild(gRoot);
+}
+
+function getBounds() {
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  G.hexes.forEach(h => {
+    const { x, y } = hexToPixel(h.q, h.r);
+    minX = Math.min(minX, x - HEX_SIZE);
+    maxX = Math.max(maxX, x + HEX_SIZE);
+    minY = Math.min(minY, y - HEX_SIZE);
+    maxY = Math.max(maxY, y + HEX_SIZE);
+  });
+  return { minX, minY, maxX, maxY };
+}
+
+function renderPlayers() {
+  const container = document.getElementById('players');
+  container.innerHTML = '<h3 style="font-size:12px;text-transform:uppercase;letter-spacing:1px;color:var(--text-dim);margin-bottom:8px">Players</h3>';
+  G.players.forEach(p => {
+    const pop = totalPop(G, p);
+    const fees = calcFees(G, p);
+    const army = countUnits(G, p.id);
+
+    // Total supply cost this round
+    let supplyTotal = 0, cutOff = 0;
+    G.hexes.forEach(h => {
+      if (h.unit && h.unit.owner === p.id) {
+        if (!hasSupplyAnchor(G, h, p)) cutOff++;
+        else supplyTotal += supplyCost(G, h, p);
+      }
+    });
+    const supplyDisplay = cutOff > 0
+      ? `<span style="color:var(--danger)">${supplyTotal}g (${cutOff} cut)</span>`
+      : supplyTotal > 0 ? `${supplyTotal}g` : '—';
+
+    const card = document.createElement('div');
+    card.className = 'player-card' + (G.turn === p.id ? ' active' : '');
+    if (p.eliminated) card.style.opacity = '0.4';
+    card.innerHTML = `
+      <div class="name"><span class="color-dot" style="background:${p.color}"></span>${p.name}${p.ai ? ' 🤖' : ''}</div>
+      <div class="house">${p.house.icon} ${p.house.name}</div>
+      <div class="house" style="font-size:10px;opacity:0.8">${p.house.power}</div>
+      <div class="stats">
+        <div class="stat">Gold: <b>${p.gold}</b></div>
+        <div class="stat">Supply Cost: <b>${supplyDisplay}</b></div>
+        <div class="stat ${pop >= WIN.pop ? 'win' : ''}">Pop: <b>${pop}</b>/${WIN.pop}</div>
+        <div class="stat ${fees >= WIN.fees ? 'win' : ''}">Tax: <b>${fees}</b>/${WIN.fees}</div>
+        <div class="stat ${army >= WIN.army ? 'win' : ''}">Army: <b>${army}</b>/${WIN.army}</div>
+        <div class="stat">Fiefs: <b>${countFiefs(G, p.id)}</b></div>
+      </div>
+    `;
+    container.appendChild(card);
+  });
+}
+
+function renderSidebar() {
+  // Event
+  const ec = document.getElementById('event-content');
+  if (G.currentEvent) {
+    ec.innerHTML = `<div class="event-card"><div class="title">${G.currentEvent.name}</div><div class="effect">${G.currentEvent.effect}</div></div>`;
+  } else {
+    ec.textContent = G.round === 1 ? 'No event in Round 1' : '—';
+  }
+
+  // Selection
+  const sc = document.getElementById('selection-content');
+  if (G.selected) {
+    const h = G.selected;
+    let s = `<b>(${h.q}, ${h.r})</b> — ${h.terrain}`;
+    if (h.fief !== null) s += `<br>Fief: ${pname(h.fief)}`;
+    if (h.holding) s += `<br>${h.holding.type} (${pname(h.holding.owner)}) — pop ${currentPop(h)}/${HOLDING_TYPES[h.holding.type].pop}`;
+    if (h.unit) {
+      let range = UNIT_TYPES[h.unit.type].move;
+      if (G.eventFlags.mud) range = 1;
+      if (G.eventFlags.forcedMarch) range += 1;
+      const rangeNote = range !== UNIT_TYPES[h.unit.type].move ? ` <span style="color:var(--accent)">(event: ${range})</span>` : '';
+      s += `<br>${h.unit.type} (${h.unit.owner >= 0 ? pname(h.unit.owner) : 'neutral'})`;
+      s += `<br><span style="font-size:11px;color:var(--text-dim)">Move: ${UNIT_TYPES[h.unit.type].move}${rangeNote} · ${h.unit.moved ? '<b style="color:var(--danger)">Already moved</b>' : '<b style="color:var(--success)">Can move</b>'}</span>`;
+      if (h.unit.owner >= 0) {
+        const owner = G.players[h.unit.owner];
+        const anchored = hasSupplyAnchor(G, h, owner);
+        const sr = supplyCost(G, h, owner, true);
+        if (!anchored) {
+          const outpostNote = sr.cost !== Infinity ? ` (outpost-only, cost ${sr.cost}g — not enough)` : '';
+          s += `<br><span style="font-size:11px;color:var(--danger)"><b>⚠ CUT OFF</b> — no castle/village reachable${outpostNote}</span>`;
+        } else {
+          const via = sr.path.slice(1, -1).map(ph =>
+            ph.fief === owner.id ? 'own' : 'passage'
+          );
+          const viaSummary = via.length ? ` via ${[...new Set(via)].join('+')}` : '';
+          s += `<br><span style="font-size:11px;color:var(--accent)">Supply cost: ${sr.cost}g${viaSummary}</span>`;
+        }
+      }
+    }
+    sc.innerHTML = s;
+  } else {
+    sc.textContent = 'Click a hex';
+  }
+
+  // Actions
+  const ac = document.getElementById('actions-content');
+  ac.innerHTML = '';
+  const p = G.players[G.turn];
+  if (G.phase === 'act' && !p.ai) {
+    if (G.selected && G.selected.unit && G.selected.unit.owner === p.id) {
+      if (!G.selected.unit.moved && !G.mode) {
+        addBtn(ac, 'Move this unit', () => { G.mode = 'move'; G.validMoves = getValidMoves(G.selected); render(); });
+      }
+      if (G.selected.unit.type === 'bowman' && !G.selected.unit.attacked && !G.mode) {
+        const targets = getBowmanTargets(G.selected);
+        if (targets.length) addBtn(ac, 'Ranged attack', () => { G.mode = 'attack'; G.validTargets = targets; G.pendingAttackHex = null; render(); });
+      }
+      // Disambiguation: hex has both enemy unit AND enemy holding — player must pick
+      if (G.mode === 'attack' && G.pendingAttackHex) {
+        const tgt = G.pendingAttackHex;
+        const matches = G.validTargets.filter(t => t.hex === tgt);
+        const hint = document.createElement('div');
+        hint.style.cssText = 'font-size:11px;color:var(--text-dim);margin:4px 0';
+        hint.textContent = 'Choose target:';
+        ac.appendChild(hint);
+        for (const m of matches) {
+          const label = m.type === 'unit'
+            ? `→ Shoot the ${tgt.unit.type}`
+            : `→ Bombard the ${tgt.holding.type} (pop ${currentPop(tgt)})`;
+          addBtn(ac, label, () => {
+            executeBowmanAttack(G.selected, tgt, m.type);
+            G.mode = null; G.validTargets = null; G.pendingAttackHex = null;
+            render();
+          });
+        }
+      }
+      if (G.mode) addBtn(ac, 'Cancel', () => { G.mode = null; G.validMoves = null; G.validTargets = null; G.pendingAttackHex = null; render(); }, 'danger');
+    }
+    addBtn(ac, 'End Turn', endTurn, 'primary');
+  } else if (G.phase === 'setup-castle' && !p.ai) {
+    ac.innerHTML = '<div style="font-size:12px;color:var(--text-dim)">Click a grassland hex to place your castle</div>';
+  }
+
+  // Buy
+  renderBuy();
+
+  // Negotiate
+  renderNegotiate();
+}
+
+function addBtn(container, text, onClick, cls) {
+  const b = document.createElement('button');
+  b.textContent = text;
+  if (cls) b.classList.add(cls);
+  b.onclick = onClick;
+  container.appendChild(b);
+}
+
+function renderBuy() {
+  const bc = document.getElementById('buy-content');
+  bc.innerHTML = '';
+  const p = G.players[G.turn];
+  if (G.phase !== 'act' || p.ai) { bc.innerHTML = '<span style="font-size:11px;color:var(--text-dim)">—</span>'; return; }
+
+  const makeRow = (label, disabled, why, onBuy) => {
+    const span = document.createElement('span');
+    span.textContent = label;
+    bc.appendChild(span);
+    const btn = document.createElement('button');
+    btn.textContent = 'Buy';
+    btn.disabled = disabled;
+    btn.title = why || '';
+    btn.onclick = onBuy;
+    bc.appendChild(btn);
+  };
+
+  // Unit building: build at selected holding if valid, else default to best spawn
+  // (castle → village → outpost). Select a holding hex to build there instead.
+  const spawns = getUnitSpawns(G, p);
+  const selectedSpawn = G.selected && spawns.includes(G.selected) ? G.selected : null;
+  const defaultSpawn = spawns.find(h => h.holding.type === 'castle')
+                    || spawns.find(h => h.holding.type === 'village')
+                    || spawns[0];
+  const spawnAt = selectedSpawn || defaultSpawn;
+
+  // Check supply at the spawn site — warn if a fresh unit would be cut off.
+  // Castles/Villages are themselves anchors so they're always safe; only Outposts
+  // can be doomed (if they have no path to a castle/village).
+  const spawnIsOutpost = spawnAt && spawnAt.holding.type === 'outpost';
+  const spawnDoomed = spawnIsOutpost && !hasSupplyAnchor(G, spawnAt, p);
+
+  ['spearman', 'bowman', 'knight'].forEach(type => {
+    const res = canBuildUnit(G, p, type);
+    if (!res.ok || !spawnAt) {
+      makeRow(`${type} — ${unitCost(G, type)}g`, true, res.why || 'No spawn', () => {});
+      return;
+    }
+    const besieger = (spawnAt.unit && spawnAt.unit.owner !== p.id) ? spawnAt.unit : null;
+    const where = ` @ ${spawnAt.holding.type}`;
+    const siege = besieger ? ` ⚔ vs ${besieger.type}` : '';
+    const doom = spawnDoomed ? ' ⚠ NO SUPPLY' : '';
+    makeRow(`${type} — ${unitCost(G, type)}g${where}${siege}${doom}`, spawnDoomed,
+      spawnDoomed ? `Unit would die — ${spawnAt.holding.type} has no supply line to castle/village` : '',
+      () => { buildUnit(G, p, type, spawnAt); render(); });
+  });
+  if (spawns.length > 1 && !selectedSpawn) {
+    const hint = document.createElement('div');
+    hint.style.cssText = 'grid-column:1/-1;font-size:10px;color:var(--text-dim);margin-top:-2px';
+    hint.textContent = `(select a holding to recruit elsewhere — ${spawns.length} available)`;
+    bc.appendChild(hint);
+  }
+
+  // Outpost: build on empty fief
+  {
+    const hex = G.selected;
+    const res = hex ? canBuildHolding(G, hex, p, 'outpost') : { ok: false, why: 'Select a hex' };
+    makeRow(`outpost — ${holdingCost(G, p, 'outpost')}g`, !res.ok, res.why, () => {
+      const r = canBuildHolding(G, hex, p, 'outpost');
+      if (!r.ok) { render(); return; }
+      p.gold -= r.cost;
+      hex.holding = { type: 'outpost', owner: p.id, damage: 0 };
+      G.componentsUsed.outpost++;
+      log(G, `${p.name} builds an outpost`, 'build');
+      render();
+    });
+  }
+
+  // Village: upgrade an outpost
+  {
+    const hex = G.selected;
+    const res = hex ? canBuildHolding(G, hex, p, 'village') : { ok: false, why: 'Select your outpost' };
+    makeRow(`village (upgrade) — ${holdingCost(G, p, 'village')}g`, !res.ok, res.why, () => {
+      const r = canBuildHolding(G, hex, p, 'village');
+      if (!r.ok) { render(); return; }
+      p.gold -= r.cost;
+      // return outpost to pool, convert to village (keep any existing damage)
+      G.componentsUsed.outpost--;
+      const dmg = hex.holding.damage || 0;
+      hex.holding = { type: 'village', owner: p.id, damage: dmg };
+      G.componentsUsed.village++;
+      log(G, `${p.name} upgrades an outpost to a village`, 'build');
+      render();
+    });
+  }
+}
+
+function renderNegotiate() {
+  const nc = document.getElementById('negotiate-content');
+  nc.innerHTML = '';
+  const p = G.players[G.turn];
+  if (G.phase !== 'act' || p.ai || G.eventFlags.noNegotiate) {
+    nc.innerHTML = '<span style="font-size:11px;color:var(--text-dim)">' + (G.eventFlags.noNegotiate ? 'Royal Envoy: no negotiation' : '—') + '</span>';
+    return;
+  }
+
+  const others = G.players.filter(o => o.id !== p.id && !o.eliminated);
+  const sel = document.createElement('select');
+  sel.id = 'neg-target';
+  others.forEach(o => { const opt = document.createElement('option'); opt.value = o.id; opt.textContent = o.name; sel.appendChild(opt); });
+  nc.appendChild(sel);
+
+  const amt = document.createElement('input');
+  amt.type = 'number'; amt.min = 0; amt.value = 3; amt.id = 'neg-amt';
+  amt.placeholder = 'Gold';
+  nc.appendChild(amt);
+
+  addBtn(nc, 'Pay for right-of-passage', () => {
+    const targetId = +sel.value;
+    const g = +amt.value;
+    if (g > p.gold) { alert('Not enough gold'); return; }
+    const target = G.players[targetId];
+    // AI accepts if g >= 2, humans auto-accept for simplicity
+    const accepts = target.ai ? g >= 2 : confirm(`${target.name}: accept ${g}g for right-of-passage?`);
+    if (accepts) {
+      p.gold -= g;
+      target.gold += g;
+      p.rightOfPassage.add(targetId);
+      log(G, `${p.name} pays ${target.name} ${g}g for passage`);
+    } else {
+      log(G, `${target.name} refuses passage`);
+    }
+    render();
+  });
+
+  addBtn(nc, 'Give gold (no conditions)', () => {
+    const targetId = +sel.value;
+    const g = +amt.value;
+    if (g > p.gold) { alert('Not enough gold'); return; }
+    p.gold -= g;
+    G.players[targetId].gold += g;
+    log(G, `${p.name} gives ${G.players[targetId].name} ${g}g`);
+    render();
+  });
+}
+
+function onHexClick(hex) {
+  const p = G.players[G.turn];
+  if (p.ai) return;
+
+  if (G.phase === 'setup-castle') {
+    const v = validateCastlePlacement(G, hex);
+    if (!v.ok) { log(G, v.why); return; }
+    hex.holding = { type: 'castle', owner: p.id, damage: 0 };
+    log(G, `${p.name} places castle at (${hex.q},${hex.r})`);
+    advancePhase();
+    render();
+    maybeRunAI();
+    return;
+  }
+
+  if (G.phase !== 'act') return;
+
+  if (G.mode === 'move' && G.validMoves) {
+    const target = G.validMoves.find(m => m.hex === hex);
+    if (target) {
+      executeMove(G.selected, hex, target.path);
+      G.mode = null; G.validMoves = null; G.selected = hex.unit ? hex : null;
+      render();
+      return;
+    }
+  }
+  if (G.mode === 'attack' && G.validTargets) {
+    const matches = G.validTargets.filter(t => t.hex === hex);
+    if (matches.length === 1) {
+      executeBowmanAttack(G.selected, hex, matches[0].type);
+      G.mode = null; G.validTargets = null; G.pendingAttackHex = null;
+      render();
+      return;
+    } else if (matches.length > 1) {
+      // Multiple target types on same hex (e.g. enemy unit + enemy holding).
+      // Sidebar will show explicit buttons for each.
+      G.pendingAttackHex = hex;
+      render();
+      return;
+    }
+  }
+
+  G.selected = hex;
+  G.mode = null; G.validMoves = null; G.validTargets = null;
+  render();
+}
+
+function endTurn() {
+  const p = G.players[G.turn];
+  // Heads-up for humans: warn if ending turn with less gold than current supply
+  // needs. AI movement between now and Upkeep may make it even worse.
+  if (G.phase === 'act' && !p.ai) {
+    let supplyNeed = 0;
+    G.hexes.forEach(h => {
+      if (h.unit && h.unit.owner === p.id && hasSupplyAnchor(G, h, p)) {
+        supplyNeed += supplyCost(G, h, p);
+      }
+    });
+    if (supplyNeed > p.gold) {
+      log(G, `⚠ ${p.name} ends turn with ${p.gold}g but supply needs ${supplyNeed}g — units will desert now`, 'combat');
+    }
+  }
+  G.selected = null; G.mode = null; G.validMoves = null; G.validTargets = null; G.pendingAttackHex = null;
+  advancePhase();
+  render();
+  maybeRunAI();
+}
+
+function showTooltip(hex, evt) {
+  const tt = document.getElementById('tooltip');
+  let s = `(${hex.q},${hex.r}) ${hex.terrain}`;
+  if (hex.fief !== null) s += ` · ${pname(hex.fief)} fief`;
+  if (hex.holding) {
+    const maxPop = HOLDING_TYPES[hex.holding.type].pop;
+    const pop = currentPop(hex);
+    s += ` · ${hex.holding.type} (${pop}/${maxPop})`;
+    const sp = siegePressure(G, hex);
+    const besieged = hex.unit && hex.unit.owner !== hex.holding.owner && hex.unit.owner !== -1;
+    const willHeal = hex.holding.damage > 0 && !besieged;
+    if (sp.dmg > 0 || willHeal) {
+      const parts = [];
+      if (sp.dmg > 0) parts.push(`🔥-${sp.dmg}`);
+      if (willHeal) parts.push('♥+1');
+      const net = (willHeal ? 1 : 0) - sp.dmg;
+      const netStr = net === 0 ? '±0' : net > 0 ? `+${net}` : `${net}`;
+      s += ` · ${parts.join(' ')} (net ${netStr}/round)`;
+    }
+  }
+  if (hex.unit) {
+    s += ` · ${hex.unit.type}`;
+    if (hex.unit.owner >= 0 && G.phase === 'act') {
+      const owner = G.players[hex.unit.owner];
+      if (!hasSupplyAnchor(G, hex, owner)) {
+        s += ' · ⚠ CUT OFF (no castle/village — will die)';
+      } else {
+        s += ` · supply cost ${supplyCost(G, hex, owner)}g`;
+      }
+    }
+  }
+  tt.textContent = s;
+  tt.style.display = 'block';
+  tt.style.left = (evt.clientX + 15) + 'px';
+  tt.style.top = (evt.clientY + 15) + 'px';
+}
+function hideTooltip() { document.getElementById('tooltip').style.display = 'none'; }
+
+function log(g, msg, cls) {
+  g.logEntries.push({ msg, cls });
+  const el = document.getElementById('log');
+  const div = document.createElement('div');
+  div.className = 'entry' + (cls ? ' ' + cls : '');
+  div.textContent = msg;
+  el.appendChild(div);
+  el.scrollTop = el.scrollHeight;
+}
+
+function showVictory(v) {
+  document.getElementById('victory-title').textContent = `${v.winner.name} Wins!`;
+  document.getElementById('victory-content').innerHTML = `
+    <p><b>${v.winner.name}</b> (${v.winner.house.name}) achieves victory by <b>${v.cond}</b> (${v.val})</p>
+    <p style="margin-top:12px;font-size:13px;color:var(--text-dim)">Round ${G.round}</p>
+  `;
+  document.getElementById('victory-modal').style.display = 'flex';
+}
+
+// ============================================================================
+// SETUP MODAL
+// ============================================================================
+
+function initSetupModal() {
+  const countSel = document.getElementById('setup-count');
+  const slotsDiv = document.getElementById('setup-slots');
+
+  function refresh() {
+    const n = +countSel.value;
+    slotsDiv.innerHTML = '';
+    for (let i = 0; i < n; i++) {
+      const row = document.createElement('div');
+      row.className = 'row';
+      row.innerHTML = `
+        <label><span class="color-dot" style="background:${COLORS[i]}"></span> Player ${i+1}</label>
+        <input type="text" id="slot-name-${i}" value="${COLOR_NAMES[i]}" style="width:120px">
+        <select id="slot-type-${i}">
+          <option value="human">Human</option>
+          <option value="ai" ${i > 0 ? 'selected' : ''}>Computer</option>
+        </select>
+      `;
+      slotsDiv.appendChild(row);
+    }
+  }
+  countSel.onchange = refresh;
+  refresh();
+
+  document.getElementById('setup-start').onclick = () => {
+    const n = +countSel.value;
+    const difficulty = document.getElementById('setup-difficulty').value;
+    const cfgs = [];
+    for (let i = 0; i < n; i++) {
+      cfgs.push({
+        name: document.getElementById(`slot-name-${i}`).value || COLOR_NAMES[i],
+        ai: document.getElementById(`slot-type-${i}`).value === 'ai'
+      });
+    }
+    document.getElementById('setup-modal').style.display = 'none';
+    newGame(cfgs, difficulty);
+  };
+
+  // Tutorial card buttons
+  document.getElementById('tut-next').onclick = dismissTutorial;
+  document.getElementById('tut-skip').onclick = skipAllTutorials;
+
+  document.getElementById('btn-new-game').onclick = () => {
+    document.getElementById('setup-modal').style.display = 'flex';
+  };
+  document.getElementById('btn-end-turn').onclick = endTurn;
+  document.getElementById('btn-help').onclick = () => {
+    document.getElementById('help-modal').style.display = 'flex';
+  };
+  document.getElementById('btn-houses').onclick = () => {
+    const hc = document.getElementById('houses-content');
+    hc.innerHTML = HOUSES.map(h => {
+      const inPlay = G && G.players.some(p => p.house.key === h.key);
+      const owner = G ? G.players.find(p => p.house.key === h.key) : null;
+      return `<div style="padding:8px;border-bottom:1px solid var(--border);${inPlay ? '' : 'opacity:0.4'}">
+        <div style="font-weight:600">${h.icon} ${h.name}${owner ? ` — <span style="color:${owner.color}">${owner.name}</span>` : ''}</div>
+        <div style="font-size:12px;color:var(--text-dim);margin-top:2px">${h.power}</div>
+      </div>`;
+    }).join('');
+    document.getElementById('houses-modal').style.display = 'flex';
+  };
+}
+
+// ============================================================================
+// UTILITIES
+// ============================================================================
+
+function shuffle(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+}
+
+// ============================================================================
+// INIT
+// ============================================================================
+
+initSetupModal();
+
+</script>
+</body>
+</html>
