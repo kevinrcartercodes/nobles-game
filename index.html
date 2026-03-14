@@ -788,11 +788,14 @@
     /* Header compacts: smaller title, buttons wrap to a second row */
     #header { padding: 8px 12px 6px; }
     #header::after { display: none; } /* torn edge doesn't read at this scale */
-    #header-top { flex-wrap: wrap; gap: 8px; }
-    #header h1 { font-size: 20px; padding-left: 28px; letter-spacing: 2px; }
-    #header h1::before { width: 22px; height: 22px; }
-    #header .phase { font-size: 12px; width: 100%; order: 10; }
-    #header button { padding: 10px 14px; font-size: 11px; }
+    /* Keep all four buttons on one row with the title — phase text wraps
+       below on its own line so buttons don't push it around. */
+    #header-top { flex-wrap: wrap; gap: 6px; row-gap: 4px; }
+    #header h1 { font-size: 17px; padding-left: 24px; letter-spacing: 1.5px; flex: 1 0 auto; }
+    #header h1::before { width: 20px; height: 20px; }
+    #header .phase { font-size: 11px; width: 100%; order: 10; }
+    #header .spacer { display: none; } /* title's flex-grow does the pushing now */
+    #header button { padding: 8px 10px; font-size: 10px; flex: 0 0 auto; }
 
     /* Progress bar scrolls sideways rather than wrapping into mush */
     #progress-bar {
@@ -804,26 +807,40 @@
     }
     .prog-player { min-width: 130px; flex-shrink: 0; }
 
-    /* Board gets a fixed viewport slice — tall enough to play on, short
-       enough that you can reach the action panel without scrolling forever.
-       55vh is the sweet spot on most phones. */
+    /* Board fills most of the viewport — less table showing, more map.
+       Vignette inset shrinks so the wood frame is a thin strip, not a
+       picture frame. */
     #board-wrap {
-      height: 55vh;
-      min-height: 340px;
-      order: 1;
+      height: 62vh;
+      min-height: 360px;
+      order: 3;
+      box-shadow: inset 0 0 30px rgba(0,0,0,0.35);
     }
 
-    /* Sidebar (actions/buy) comes RIGHT after the board — it's what you tap
-       during your turn. Players list and log push below. */
-    #sidebar { order: 2; padding: 12px; }
-    #players { order: 3; padding: 12px; }
-    #log     { order: 4; max-height: 200px; }
+    /* Flatten the sidebar so its sections become siblings of the board in
+       the #app flex column — lets us interleave them around the map.
+       display:contents drops the wrapper box entirely; children inherit
+       flex-item status from #app. */
+    #sidebar { display: contents; }
+    #sidebar > .section { margin: 10px 12px 0; }
+
+    /* Actions first — it's what you tap most. Event second, reference card
+       for the round's rule change. Board third. Selected pushed below Buy
+       since tooltip covers most of what Selected shows anyway. */
+    #actions-section   { order: 1; }
+    #event-section     { order: 2; }
+    /* board-wrap         order: 3  */
+    #buy-section       { order: 4; }
+    #selected-section  { order: 5; }
+    #negotiate-section { order: 6; }
+    #players           { order: 7; padding: 12px; }
+    #log               { order: 8; max-height: 200px; }
 
     /* Touch targets — Apple's 44pt minimum */
     .actions button,
     .negotiate-panel button { min-height: 44px; font-size: 14px; }
     .buy-grid button { min-height: 36px; padding: 8px 14px; font-size: 12px; }
-    .section { padding: 14px; }
+    #sidebar > .section { padding: 14px; }
     .section h3 { font-size: 12px; }
 
     /* Player cards lose the casual-toss rotation — it wastes width */
@@ -873,9 +890,10 @@
 
   /* Very small phones — squeeze harder */
   @media (max-width: 380px) {
-    #header h1 { font-size: 17px; }
-    #header button { padding: 8px 10px; font-size: 10px; }
-    #board-wrap { height: 50vh; min-height: 300px; }
+    #header h1 { font-size: 15px; padding-left: 20px; }
+    #header h1::before { width: 16px; height: 16px; }
+    #header button { padding: 7px 8px; font-size: 9px; }
+    #board-wrap { height: 58vh; min-height: 320px; }
     .prog-player { min-width: 115px; }
   }
 </style>
@@ -1229,11 +1247,11 @@
       <h3>Current Event</h3>
       <div class="content" id="event-content">—</div>
     </div>
-    <div class="section">
+    <div class="section" id="selected-section">
       <h3>Selected</h3>
       <div class="content" id="selection-content">Click a hex</div>
     </div>
-    <div class="section">
+    <div class="section" id="actions-section">
       <h3>Actions</h3>
       <div class="actions" id="actions-content"></div>
     </div>
@@ -1705,14 +1723,24 @@ function newGame(playerConfigs, difficulty = 'medium') {
   const aiGoldBonus = difficulty === 'hard' ? 10 : difficulty === 'easy' ? -5 : 0;
   players.forEach(p => { if (p.ai) p.gold = Math.max(5, p.gold + aiGoldBonus); });
 
+  // Roll for first player. Seat order stays fixed (P0 keeps their color),
+  // but WHO acts first each round is random. Castle placement runs in
+  // reverse turn order — last-to-act places first (terrain compensation),
+  // so the seat that drew the initiative places their castle LAST.
+  const firstPlayer = Math.floor(Math.random() * players.length);
+  const lastInTurnOrder = (firstPlayer + players.length - 1) % players.length;
+
   G = {
     players, hexes, hexMap,
     round: 1,
     phase: 'setup-castle',
-    // Castle placement runs in REVERSE (last player picks first — best terrain
-    // compensation for going last in turn order). Game play then starts at P0.
-    turn: players.length - 1,
-    firstPlayer: 0,
+    turn: lastInTurnOrder,
+    firstPlayer,
+    // Seat that won the initiative roll — preserved across rounds even if
+    // they get eliminated (doEnd walks forward from here to find the next
+    // alive seat rather than resetting to 0).
+    firstPlayerSeat: firstPlayer,
+    castlesPlaced: 0,
     selected: null,
     mode: null,
     currentEvent: null,
@@ -1728,6 +1756,9 @@ function newGame(playerConfigs, difficulty = 'medium') {
 
   log(G, `=== NEW GAME — ${n} players — ${difficulty.toUpperCase()} ===`, 'turn');
   log(G, `Houses: ${players.map(p => `${p.name}→${p.house.name}`).join(', ')}`);
+  const turnOrder = [];
+  for (let i = 0; i < n; i++) turnOrder.push(players[(firstPlayer + i) % n].name);
+  log(G, `Initiative: ${players[firstPlayer].name} goes first. Turn order: ${turnOrder.join(' → ')}`, 'turn');
 
   render();
 
@@ -1981,7 +2012,11 @@ function checkCapture(hex) {
   if (currentPop(hex) > 0) return;
   const oldOwner = hex.holding.owner;
   const newOwner = hex.unit ? hex.unit.owner : null;
-  if (newOwner === null) return; // shouldn't happen with melee-on-tile
+  // Neutral units (owner -1, leftovers from a prior elimination) can be
+  // squatting on a building when adjacent siege drops it to 0. They don't
+  // capture — the building just sits at 0 until a real player walks on.
+  // Without this guard, pname(-1) → G.players[-1].name → TypeError.
+  if (newOwner === null || newOwner < 0) return;
 
   log(G, `${pname(newOwner)} CAPTURES ${pname(oldOwner)}'s ${hex.holding.type}!`, 'turn');
   hex.holding.owner = newOwner;
@@ -2408,10 +2443,13 @@ function doEnd(g) {
     if (army >= WIN.army) return { winner: p, cond: 'Army', val: army };
   }
 
-  // Fixed turn order — no first-player rotation. If the nominal first player
-  // has been eliminated, skip forward to the next alive seat.
-  g.firstPlayer = 0;
-  while (g.players[g.firstPlayer].eliminated) {
+  // Fixed turn order — no rotation. Anchor to the seat that won the
+  // initiative roll at game start. If they've been eliminated, walk
+  // clockwise to the next living seat. (Previously this reset to seat 0
+  // every round, which meant slot 0 was always first regardless of roll.)
+  g.firstPlayer = g.firstPlayerSeat;
+  let guard = 0;
+  while (g.players[g.firstPlayer].eliminated && guard++ < g.players.length) {
     g.firstPlayer = (g.firstPlayer + 1) % g.players.length;
   }
 
@@ -2633,9 +2671,12 @@ function aiPickDisbandVictim(g, p, units) {
 
 function advancePhase() {
   if (G.phase === 'setup-castle') {
-    // Reverse order — last player placed first, now count down to P0
-    G.turn--;
-    if (G.turn < 0) {
+    // Reverse turn order — walk backward around the table. Can't use
+    // G.turn < 0 as the exit anymore since firstPlayer is random (the walk
+    // might wrap through 0 mid-sequence). Count placements instead.
+    G.castlesPlaced++;
+    G.turn = (G.turn - 1 + G.players.length) % G.players.length;
+    if (G.castlesPlaced >= G.players.length) {
       // All castles placed — place starting spearmen & fiefs
       G.players.forEach(p => {
         const castle = G.hexes.find(h => h.holding && h.holding.type === 'castle' && h.holding.owner === p.id);
@@ -2846,7 +2887,25 @@ function renderProgress() {
   bar.innerHTML = '';
   if (!G || G.phase === 'setup-castle') { bar.innerHTML = '<span style="font-size:11px;color:var(--text-dim)">Win progress will appear here</span>'; return; }
 
-  G.players.forEach(p => {
+  // Leaderboard ordering: human(s) pinned left, then everyone else sorted by
+  // threat — whoever is closest to ANY win condition. "Closest" is the max
+  // of the three progress fractions, not the sum: someone at 14/15 pop is
+  // one turn from winning even if their tax and army are zero. Eliminated
+  // players sink to the bottom so they scroll off the right edge on mobile.
+  const threat = p => {
+    if (p.eliminated) return -1;
+    return Math.max(
+      totalPop(G, p)   / WIN.pop,
+      calcFees(G, p)   / WIN.fees,
+      countUnits(G, p.id) / WIN.army
+    );
+  };
+  const ordered = [...G.players].sort((a, b) => {
+    if (a.ai !== b.ai) return a.ai ? 1 : -1;   // humans first
+    return threat(b) - threat(a);               // then by danger
+  });
+
+  ordered.forEach(p => {
     const pop = totalPop(G, p);
     const fees = calcFees(G, p);
     const army = countUnits(G, p.id);
@@ -2886,12 +2945,16 @@ function renderHeader() {
   document.getElementById('btn-end-turn').disabled = G.phase !== 'act' || p.ai;
 }
 
-// Lighten a hex color by blending toward white — used for piece highlights
+// Both bounds must clamp: darken() is lighten(-amt), so channels can go
+// negative (e.g. Azure #1c7ed6 → r=28, darken(60) → r=-32). A negative
+// channel <<16 produces a negative int whose .toString(16) starts with '-',
+// yielding garbage like '#-1fae4c' that browsers silently drop.
 function lighten(hex, amt) {
   const n = parseInt(hex.slice(1), 16);
-  const r = Math.min(255, (n >> 16) + amt);
-  const g = Math.min(255, ((n >> 8) & 0xff) + amt);
-  const b = Math.min(255, (n & 0xff) + amt);
+  const clamp = v => Math.max(0, Math.min(255, v));
+  const r = clamp((n >> 16)        + amt);
+  const g = clamp(((n >> 8) & 0xff) + amt);
+  const b = clamp((n & 0xff)        + amt);
   return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, '0')}`;
 }
 function darken(hex, amt) { return lighten(hex, -amt); }
@@ -2913,7 +2976,7 @@ function renderBoard() {
   if (defs) svg.appendChild(defs);
 
   const bounds = getBounds();
-  const pad = 70;
+  const pad = 50;
   svg.setAttribute('viewBox', `${bounds.minX - pad} ${bounds.minY - pad} ${bounds.maxX - bounds.minX + pad*2} ${bounds.maxY - bounds.minY + pad*2}`);
   svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
 
