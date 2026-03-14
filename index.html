@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Nobles — v0.7.5 Playtest</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -766,6 +767,117 @@
     border: 1px solid rgba(0,0,0,0.2);
   }
   ::-webkit-scrollbar-thumb:hover { background: linear-gradient(180deg, var(--gold), var(--gold-dark)); }
+
+  /* =========================================================================
+     MOBILE — vertical restack. Desktop rules above are untouched; everything
+     here is additive overrides under a max-width gate. The philosophy: on a
+     phone the BOARD is the game and everything else scrolls under it.
+     Breakpoint at 820px catches phones + small tablets in portrait.
+     ========================================================================= */
+  @media (max-width: 820px) {
+    body { overflow: auto; -webkit-tap-highlight-color: transparent; }
+
+    /* Flatten the grid to a single scrolling column */
+    #app {
+      display: flex;
+      flex-direction: column;
+      height: auto;
+      min-height: 100vh;
+    }
+
+    /* Header compacts: smaller title, buttons wrap to a second row */
+    #header { padding: 8px 12px 6px; }
+    #header::after { display: none; } /* torn edge doesn't read at this scale */
+    #header-top { flex-wrap: wrap; gap: 8px; }
+    #header h1 { font-size: 20px; padding-left: 28px; letter-spacing: 2px; }
+    #header h1::before { width: 22px; height: 22px; }
+    #header .phase { font-size: 12px; width: 100%; order: 10; }
+    #header button { padding: 10px 14px; font-size: 11px; }
+
+    /* Progress bar scrolls sideways rather than wrapping into mush */
+    #progress-bar {
+      overflow-x: auto;
+      overflow-y: hidden;
+      -webkit-overflow-scrolling: touch;
+      padding-bottom: 4px;
+      min-height: 50px;
+    }
+    .prog-player { min-width: 130px; flex-shrink: 0; }
+
+    /* Board gets a fixed viewport slice — tall enough to play on, short
+       enough that you can reach the action panel without scrolling forever.
+       55vh is the sweet spot on most phones. */
+    #board-wrap {
+      height: 55vh;
+      min-height: 340px;
+      order: 1;
+    }
+
+    /* Sidebar (actions/buy) comes RIGHT after the board — it's what you tap
+       during your turn. Players list and log push below. */
+    #sidebar { order: 2; padding: 12px; }
+    #players { order: 3; padding: 12px; }
+    #log     { order: 4; max-height: 200px; }
+
+    /* Touch targets — Apple's 44pt minimum */
+    .actions button,
+    .negotiate-panel button { min-height: 44px; font-size: 14px; }
+    .buy-grid button { min-height: 36px; padding: 8px 14px; font-size: 12px; }
+    .section { padding: 14px; }
+    .section h3 { font-size: 12px; }
+
+    /* Player cards lose the casual-toss rotation — it wastes width */
+    .player-card,
+    .player-card:nth-child(even),
+    .player-card:nth-child(3n) { transform: none; }
+    .player-card.active { transform: scale(1.01); }
+
+    /* Tutorial card centers instead of hugging a sidebar that isn't there */
+    #tutorial-card {
+      top: auto; bottom: 20px;
+      left: 12px; right: 12px;
+      width: auto;
+      transform: none;
+    }
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateY(20px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Event reveal card shrinks to fit narrow screens */
+    #event-card-big {
+      width: calc(100vw - 40px);
+      max-width: 320px;
+      min-height: 380px;
+      padding: 18px 20px;
+    }
+    #event-card-big .event-title { font-size: 22px; }
+    #event-card-big .event-rule { font-size: 14px; }
+
+    /* Modals go nearly full-width */
+    .modal {
+      min-width: 0;
+      width: calc(100vw - 24px);
+      max-width: none;
+      padding: 20px 18px;
+      max-height: 88vh;
+    }
+    .modal h2 { font-size: 18px; }
+    .modal .row { flex-wrap: wrap; }
+    .modal select, .modal input { width: 100%; }
+    .modal .actions { flex-wrap: wrap; }
+    .modal .actions button { flex: 1; min-width: 120px; min-height: 44px; }
+
+    .tooltip { max-width: 180px; font-size: 11px; }
+  }
+
+  /* Very small phones — squeeze harder */
+  @media (max-width: 380px) {
+    #header h1 { font-size: 17px; }
+    #header button { padding: 8px 10px; font-size: 10px; }
+    #board-wrap { height: 50vh; min-height: 300px; }
+    .prog-player { min-width: 115px; }
+  }
 </style>
 </head>
 <body>
@@ -1258,10 +1370,14 @@
 // CONSTANTS & DATA
 // ============================================================================
 
-// Heraldic house colors — rich, saturated tones that read well on parchment
-// AND on the painted terrain tiles. These are the wooden-piece paint colors.
-const COLORS = ['#a8262a', '#2a5da8', '#3a7a2f', '#d07d1a', '#7a3a9a', '#1f8a85'];
-const COLOR_NAMES = ['Crimson', 'Azure', 'Verdant', 'Amber', 'Violet', 'Teal'];
+// House paint colors. These get darkened by the woodgrain filter and the
+// top-to-bottom gradient, so they need to START bright enough to survive
+// that. The previous palette was "heraldic" (muted, tasteful) — and unreadable
+// once filtered. This set is blunter: max hue spread, high chroma, no two
+// colors within 50° of each other. Teal is gone (too close to both blue and
+// green); Ivory takes its slot — reads as "white pieces" against any terrain.
+const COLORS = ['#e03131', '#1c7ed6', '#2f9e44', '#f59f00', '#9c36b5', '#f1ede4'];
+const COLOR_NAMES = ['Crimson', 'Azure', 'Verdant', 'Gold', 'Violet', 'Ivory'];
 
 const UNIT_TYPES = {
   spearman: { move: 1, cost: 20, icon: '▲', beats: 'knight' },
@@ -3089,11 +3205,31 @@ function renderMeeple(hex, x, y) {
   // All three are bottom-anchored (y positions the piece's base at tile floor)
   // so the spearman's spear visibly pokes above where other pieces end.
   const MEEPLE_DIMS = {
-    spearman: { w: 19, h: 40, y: -30 },  // tall spike
-    bowman:   { w: 40, h: 31, y: -19 },  // wide crescent
-    knight:   { w: 40, h: 40, y: -28 },  // broad horse
+    spearman: { w: 19, h: 40, y: -30, baseR: 11 },  // tall spike, narrow base
+    bowman:   { w: 40, h: 31, y: -19, baseR: 17 },  // wide crescent, wide base
+    knight:   { w: 40, h: 40, y: -28, baseR: 18 },  // broad horse, broad base
   };
   const d = MEEPLE_DIMS[u.type];
+
+  // Solid-color base disc — the "miniature base." The meeple body gets
+  // wood-grain filtered and gradient-shaded, which washes out owner color
+  // at small sizes. This disc is the raw unfiltered player color: the thing
+  // you actually read when scanning the board. Also differs in WIDTH per
+  // unit type, reinforcing the silhouette read (narrow spearman, wide horse).
+  const baseY = 11;
+  const baseRim = document.createElementNS(SVG_NS, 'ellipse');
+  baseRim.setAttribute('cx', 0); baseRim.setAttribute('cy', baseY);
+  baseRim.setAttribute('rx', d.baseR); baseRim.setAttribute('ry', d.baseR * 0.4);
+  baseRim.setAttribute('fill', darken(color, 60));
+  g.appendChild(baseRim);
+  const base = document.createElementNS(SVG_NS, 'ellipse');
+  base.setAttribute('cx', 0); base.setAttribute('cy', baseY - 1.5);
+  base.setAttribute('rx', d.baseR - 1); base.setAttribute('ry', (d.baseR - 1) * 0.4);
+  base.setAttribute('fill', color);
+  base.setAttribute('stroke', lighten(color, 40));
+  base.setAttribute('stroke-width', '0.6');
+  g.appendChild(base);
+
   const use = document.createElementNS(SVG_NS, 'use');
   use.setAttribute('href', `#meeple-${u.type}`);
   use.setAttribute('x', -d.w / 2);
