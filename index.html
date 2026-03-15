@@ -1457,6 +1457,12 @@ if (FIREBASE_CONFIG) {
   try {
     firebase.initializeApp(FIREBASE_CONFIG);
     DB = firebase.firestore();
+    // Firestore THROWS SYNCHRONOUSLY on undefined values during .set() input
+    // validation — before the promise is even created, so .catch() never sees
+    // it. G has lots of optionally-undefined fields (unit.rangedUsed,
+    // logEntries[].cls, _lastUnitType). This setting makes the SDK silently
+    // drop them instead. We don't care about those fields on read anyway.
+    DB.settings({ ignoreUndefinedProperties: true });
   } catch (e) {
     console.warn('[online] Firebase init failed — falling back to offline', e);
   }
@@ -1833,18 +1839,26 @@ function hydrate(data) {
 
 function pushState() {
   if (!ROOM || !DB || !G) return;
-  const payload = serialize(G);
-  G.version = payload.version;  // so our own echo doesn't re-apply
-  DB.collection('games').doc(ROOM).set({ state: payload }, { merge: true })
-    .catch(e => console.error('[sync] push failed', e));
+  // Synchronous throws here (SDK input validation, serialize bugs) must not
+  // propagate — they'd kill commit() before render() runs and the player sees
+  // a blank board with no clue what went wrong. Swallow and log; the game
+  // stays playable locally even if sync is busted.
+  try {
+    const payload = serialize(G);
+    G.version = payload.version;  // so our own echo doesn't re-apply
+    DB.collection('games').doc(ROOM).set({ state: payload }, { merge: true })
+      .catch(e => console.error('[sync] push failed (async)', e));
+  } catch (e) {
+    console.error('[sync] push failed (sync) — game continues offline', e);
+  }
 }
 
-// commit() = push + render. Call this after any mutation that other players
-// need to see. For purely local UI changes (selecting a hex, entering move
-// mode), just call render() directly — no need to broadcast your cursor.
+// commit() = render + push. Render FIRST so a busted push doesn't blank the
+// acting player's board. For purely local UI changes (selecting a hex,
+// entering move mode), just call render() directly.
 function commit() {
-  pushState();
   render();
+  pushState();
 }
 
 function subscribeToRoom(code) {
@@ -4049,7 +4063,7 @@ function showTooltip(hex, evt) {
 }
 function hideTooltip() { document.getElementById('tooltip').style.display = 'none'; }
 
-function log(g, msg, cls) {
+function log(g, msg, cls = null) {
   g.logEntries.push({ msg, cls });
   const el = document.getElementById('log');
   const div = document.createElement('div');
