@@ -1921,7 +1921,10 @@ function resolveCombat(attackerHex, defenderHex, isRanged = false) {
   }
 }
 
-function pname(pid) { return G.players[pid].name; }
+// pid -1 = neutral (eliminated player's leftover units). Every combat log
+// line calls pname on both sides — unguarded G.players[-1].name was the
+// crash behind "cannot attack the colorless knight".
+function pname(pid) { return pid < 0 ? 'a masterless' : G.players[pid].name; }
 
 // --- Execute move ---
 
@@ -2012,11 +2015,17 @@ function checkCapture(hex) {
   if (currentPop(hex) > 0) return;
   const oldOwner = hex.holding.owner;
   const newOwner = hex.unit ? hex.unit.owner : null;
-  // Neutral units (owner -1, leftovers from a prior elimination) can be
-  // squatting on a building when adjacent siege drops it to 0. They don't
-  // capture — the building just sits at 0 until a real player walks on.
-  // Without this guard, pname(-1) → G.players[-1].name → TypeError.
-  if (newOwner === null || newOwner < 0) return;
+  if (newOwner === null) return; // nobody standing on it — wait for a claimant
+
+  // Neutral squatter (owner -1, debris from a prior elimination). Can't
+  // capture, but also can't stay: a neutral can never move, so returning
+  // here would deadlock the building at 0 forever. The collapse takes them.
+  // Next real unit to walk on claims the ruins. (pname(-1) would also crash.)
+  if (newOwner < 0) {
+    log(G, `${pname(oldOwner)}'s ${hex.holding.type} falls — the masterless garrison is buried in the rubble`, 'combat');
+    hex.unit = null;
+    return;
+  }
 
   log(G, `${pname(newOwner)} CAPTURES ${pname(oldOwner)}'s ${hex.holding.type}!`, 'turn');
   hex.holding.owner = newOwner;
@@ -2051,7 +2060,9 @@ function getBowmanTargets(hex) {
   const targets = [];
   const addTargetsAt = (nh) => {
     if (!nh) return;
-    const enemyUnit = nh.unit && nh.unit.owner !== hex.unit.owner && nh.unit.owner !== -1;
+    // Neutrals are valid targets — they're leftovers from an eliminated
+    // house, just sitting there. No reason you can't shoot them.
+    const enemyUnit = nh.unit && nh.unit.owner !== hex.unit.owner;
     const enemyHolding = nh.holding && nh.holding.owner !== hex.unit.owner;
     // Enemy holding is always a valid building target — regardless of who (if anyone) is on it.
     // This lets a bowman choose: shoot the besieger/garrison, or bombard the walls.
@@ -2416,7 +2427,10 @@ function doEnd(g) {
   // Heal holdings that aren't besieged (enemy unit on them)
   g.hexes.forEach(h => {
     if (h.holding && h.holding.damage > 0) {
-      const besieged = (h.unit && h.unit.owner !== h.holding.owner);
+      // Neutrals don't block heal — they're debris, not a siege. The
+      // on-board ♥+1 badge already ignores neutrals (renderHolding checks
+      // owner !== -1); this was the one spot that didn't, so the UI lied.
+      const besieged = (h.unit && h.unit.owner !== h.holding.owner && h.unit.owner !== -1);
       if (!besieged) {
         h.holding.damage = Math.max(0, h.holding.damage - 1);
       }
