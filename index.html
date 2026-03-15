@@ -1267,7 +1267,45 @@
   <div id="log"></div>
 </div>
 
-<div id="setup-modal" class="modal-overlay">
+<!-- Lobby — appears before setup. Create/Join an online room or play solo. -->
+<div id="lobby-modal" class="modal-overlay">
+  <div class="modal">
+    <h2>Nobles</h2>
+
+    <div id="lobby-landing">
+      <div class="actions" style="gap:10px">
+        <button id="lobby-offline" class="primary">Play Offline</button>
+        <button id="lobby-create">Create Online Room</button>
+        <div class="row" style="margin:8px 0 0">
+          <input type="text" id="lobby-code" placeholder="ROOM CODE" maxlength="6"
+                 style="text-transform:uppercase;letter-spacing:3px;font-family:Cinzel,serif;font-weight:700;text-align:center;flex:1">
+          <button id="lobby-join">Join</button>
+        </div>
+      </div>
+      <p id="lobby-offline-note" style="font-size:11px;color:var(--ink-faint);margin-top:14px;font-style:italic;text-align:center">
+        Online play requires Firebase config — see FIREBASE_CONFIG in the page source.
+      </p>
+    </div>
+
+    <div id="lobby-room" style="display:none">
+      <div style="text-align:center;margin-bottom:16px">
+        <div style="font-size:11px;color:var(--ink-faint);letter-spacing:1px">ROOM CODE</div>
+        <div id="lobby-room-code" style="font-family:Cinzel,serif;font-size:32px;font-weight:900;letter-spacing:6px;color:var(--gold-dark)"></div>
+        <div style="font-size:11px;color:var(--ink-light);margin-top:4px">Share this with the other players</div>
+      </div>
+      <div id="lobby-seats" style="margin-bottom:14px"></div>
+      <div class="actions">
+        <button id="lobby-leave">Leave</button>
+        <button id="lobby-start" class="primary">Start Game</button>
+      </div>
+      <p id="lobby-wait" style="font-size:11px;color:var(--ink-faint);margin-top:10px;font-style:italic;text-align:center;display:none">
+        Waiting for the host to start…
+      </p>
+    </div>
+  </div>
+</div>
+
+<div id="setup-modal" class="modal-overlay" style="display:none">
   <div class="modal">
     <h2>New Game of Nobles</h2>
     <div class="row">
@@ -1383,7 +1421,63 @@
   </div>
 </div>
 
+<!-- Firebase compat SDK — namespaced API, no ES modules, so the whole game
+     stays in one plain <script> block. Only firestore is needed; auth is
+     anonymous via localStorage clientId. -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+
 <script>
+// ============================================================================
+// ONLINE MULTIPLAYER — Firebase config
+// ============================================================================
+//
+// To enable online play:
+//   1. Create a project at https://console.firebase.google.com
+//   2. Add a Web App → copy the config object it gives you
+//   3. Paste it below (replace the null)
+//   4. In Firestore → Rules, allow read/write on /games/**:
+//        match /games/{room} { allow read, write: if true; }
+//      (Fine for a playtest. Tighten later.)
+//
+// With config left null, the game runs fully offline exactly as before —
+// the lobby just hides its Create/Join buttons.
+
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyA5Rjsa1Y54JK96Itz7-6Tl8rVbNXNOQys",
+  authDomain: "noblesthegame.firebaseapp.com",
+  projectId: "noblesthegame",
+  storageBucket: "noblesthegame.firebasestorage.app",
+  messagingSenderId: "78329656934",
+  appId: "1:78329656934:web:a423d2db3bde1c3db01fa7",
+};
+
+let DB = null;
+if (FIREBASE_CONFIG) {
+  try {
+    firebase.initializeApp(FIREBASE_CONFIG);
+    DB = firebase.firestore();
+  } catch (e) {
+    console.warn('[online] Firebase init failed — falling back to offline', e);
+  }
+}
+
+// Stable per-browser identity. No auth — this is a playtest, we trust the
+// table. A real release would swap this for Firebase anonymous auth.
+const CLIENT_ID = (() => {
+  let id = localStorage.getItem('nobles-client-id');
+  if (!id) {
+    id = 'c_' + Math.random().toString(36).slice(2, 10);
+    localStorage.setItem('nobles-client-id', id);
+  }
+  return id;
+})();
+
+// Active room. Null when playing offline. Set when you create/join.
+let ROOM = null;           // room code string
+let ROOM_UNSUB = null;     // firestore snapshot unsubscribe fn
+let IS_HOST = false;       // true if this client created the room (runs AI)
+
 // ============================================================================
 // CONSTANTS & DATA
 // ============================================================================
@@ -1615,6 +1709,227 @@ function generateMap(numPlayers) {
 let G = null;
 
 // ============================================================================
+// SERIALIZE / HYDRATE — Firestore can't store Sets, function refs, or
+// object-identity references. G has all three:
+//   - players[].rightOfPassage: Set<playerId>  → array
+//   - players[].house: ref into HOUSES          → house.key string
+//   - eventDeck/Discard/currentEvent: refs into EVENTS (with .resolve fns)
+//                                               → indices
+//   - tutorialShown: Set<string>                → array
+//   - selected: ref into hexes[]                → {q,r} coords
+//   - hexMap: derived lookup table              → dropped, rebuilt on hydrate
+//   - mode/validMoves/validTargets/_pauseAI/etc → per-client UI state, not synced
+//
+// Everything else (hexes, units, holdings, gold, flags) is already plain JSON.
+// The pair is lossless on game state and lossy on UI state, which is correct:
+// when a remote action arrives, YOUR selection/move-preview gets cleared.
+// ============================================================================
+
+function serialize(g) {
+  // Event objects are identity-refs into the EVENTS array — store indices.
+  // indexOf is O(n) but n=19 and this runs once per action, not per frame.
+  const evIdx = ev => ev ? EVENTS.indexOf(ev) : -1;
+
+  return {
+    version: (g.version || 0) + 1,  // bumped on every write; reader skips stale snapshots
+
+    players: g.players.map(p => ({
+      id: p.id, name: p.name, color: p.color, ai: p.ai,
+      clientId: p.clientId || null,        // which browser controls this seat (null = AI or unclaimed)
+      house: p.house.key,                  // ref → key
+      gold: p.gold,
+      eliminated: p.eliminated,
+      capturedHolding: p.capturedHolding,
+      unitBuiltThisRound: p.unitBuiltThisRound,
+      rightOfPassage: [...p.rightOfPassage],  // Set → array
+      _usedRoyalFavor: p._usedRoyalFavor || false,
+    })),
+
+    // Hexes are already plain objects. hexMap is a derived index — don't ship it.
+    hexes: g.hexes,
+
+    round: g.round,
+    phase: g.phase,
+    turn: g.turn,
+    firstPlayer: g.firstPlayer,
+    firstPlayerSeat: g.firstPlayerSeat,
+    castlesPlaced: g.castlesPlaced,
+
+    // Events: EVENTS[i] objects carry .resolve closures — store positions instead
+    currentEvent: evIdx(g.currentEvent),
+    eventDeck:    g.eventDeck.map(evIdx),
+    eventDiscard: g.eventDiscard.map(evIdx),
+    eventFlags:   g.eventFlags,
+
+    componentsUsed: g.componentsUsed,
+    difficulty: g.difficulty,
+    logEntries: g.logEntries,
+
+    tutorialShown: [...g.tutorialShown],
+    tutorialSkipped: g.tutorialSkipped,
+
+    // Selection is deliberately NOT synced — it's per-client UI, and leaking
+    // it tells opponents what you're about to do. Re-resolved locally after
+    // hydrate (see applySnapshot).
+  };
+}
+
+function hydrate(data) {
+  const houseByKey = Object.fromEntries(HOUSES.map(h => [h.key, h]));
+  const evAt = i => (i >= 0 && i < EVENTS.length) ? EVENTS[i] : null;
+
+  // Rebuild the q,r → hex lookup
+  const hexMap = {};
+  for (const h of data.hexes) hexMap[hexKey(h.q, h.r)] = h;
+
+  const g = {
+    version: data.version,
+
+    players: data.players.map(p => ({
+      ...p,
+      house: houseByKey[p.house],
+      rightOfPassage: new Set(p.rightOfPassage),
+    })),
+
+    hexes: data.hexes,
+    hexMap,
+
+    round: data.round,
+    phase: data.phase,
+    turn: data.turn,
+    firstPlayer: data.firstPlayer,
+    firstPlayerSeat: data.firstPlayerSeat,
+    castlesPlaced: data.castlesPlaced,
+
+    currentEvent: evAt(data.currentEvent),
+    eventDeck:    data.eventDeck.map(evAt).filter(Boolean),
+    eventDiscard: data.eventDiscard.map(evAt).filter(Boolean),
+    eventFlags:   data.eventFlags,
+
+    componentsUsed: data.componentsUsed,
+    difficulty: data.difficulty,
+    logEntries: data.logEntries,
+
+    tutorialShown: new Set(data.tutorialShown),
+    tutorialSkipped: data.tutorialSkipped,
+
+    // Per-client UI state — fresh on every hydrate. A remote action landing
+    // mid-move-preview clears your preview, which is correct: the board changed.
+    selected: null,
+    mode: null,
+    validMoves: null,
+    validTargets: null,
+    pendingAttackHex: null,
+  };
+
+  return g;
+}
+
+// ============================================================================
+// SYNC — pushState writes G to Firestore; applySnapshot pulls remote changes.
+// The whole G is written every time (~20KB). Firestore bills per write, not
+// per byte, and a full game is a few hundred writes. Diffing would be premature.
+// ============================================================================
+
+function pushState() {
+  if (!ROOM || !DB || !G) return;
+  const payload = serialize(G);
+  G.version = payload.version;  // so our own echo doesn't re-apply
+  DB.collection('games').doc(ROOM).set({ state: payload }, { merge: true })
+    .catch(e => console.error('[sync] push failed', e));
+}
+
+// commit() = push + render. Call this after any mutation that other players
+// need to see. For purely local UI changes (selecting a hex, entering move
+// mode), just call render() directly — no need to broadcast your cursor.
+function commit() {
+  pushState();
+  render();
+}
+
+function subscribeToRoom(code) {
+  if (!DB) return;
+  if (ROOM_UNSUB) ROOM_UNSUB();  // drop any prior listener
+  ROOM = code;
+  ROOM_UNSUB = DB.collection('games').doc(code).onSnapshot(applySnapshot,
+    e => console.error('[sync] snapshot listener died', e));
+}
+
+function applySnapshot(doc) {
+  // Our own writes echo back immediately with hasPendingWrites=true. Ignore
+  // those — we already have that state locally and re-hydrating would thrash
+  // the selection. The server-confirmed copy arrives a moment later with
+  // hasPendingWrites=false and version == G.version, which the guard below
+  // also skips. Net effect: we only ever APPLY remote-origin changes.
+  if (doc.metadata.hasPendingWrites) return;
+
+  const data = doc.data();
+  if (!data || !data.state) return;  // lobby phase, no game yet
+
+  const incoming = data.state;
+  if (G && incoming.version <= (G.version || 0)) return;  // stale or echo
+
+  // Preserve local selection across hydrate — the hex OBJECTS are replaced
+  // (new array from Firestore), so the old ref is dead, but coords are stable.
+  const selCoords = G && G.selected ? { q: G.selected.q, r: G.selected.r } : null;
+  const hadEventOpen = G && G._eventRevealOpen;
+
+  G = hydrate(incoming);
+  if (selCoords) G.selected = G.hexMap[hexKey(selCoords.q, selCoords.r)] || null;
+
+  // Log replay — the remote client's log() calls already appended to
+  // logEntries before pushing, but OUR DOM log is stale. Rebuild from scratch
+  // so both clients show the same chronicle. (Cheap: it's just text nodes.)
+  const logEl = document.getElementById('log');
+  logEl.innerHTML = '';
+  for (const { msg, cls } of G.logEntries) {
+    const div = document.createElement('div');
+    div.className = 'entry' + (cls ? ' ' + cls : '');
+    div.textContent = msg;
+    logEl.appendChild(div);
+  }
+  logEl.scrollTop = logEl.scrollHeight;
+
+  // If a new round just started remotely, show the event card here too.
+  // hadEventOpen guards against re-showing if we already had it up.
+  if (G.currentEvent && !hadEventOpen && G.phase === 'act') {
+    // Only pop the card if this snapshot is the one that introduced the event —
+    // heuristic: round boundary. Good enough; worst case it shows twice.
+    const lastLog = G.logEntries[G.logEntries.length - 1];
+    const isFreshRound = lastLog && lastLog.msg.startsWith('Event:');
+    if (isFreshRound) showEventReveal(G.currentEvent, G.round);
+  }
+
+  render();
+
+  // If the remote turn-end handed control to an AI, and WE'RE the host,
+  // we need to run it. (Remote clients don't — they just watch.)
+  if (IS_HOST) maybeRunAI();
+}
+
+function leaveRoom() {
+  if (ROOM_UNSUB) { ROOM_UNSUB(); ROOM_UNSUB = null; }
+  ROOM = null;
+  IS_HOST = false;
+}
+
+// Turn guard. Offline: the existing p.ai check handles everything (you are
+// every human seat). Online: the current player's seat must be claimed by
+// THIS browser. Prevents clicking during another human's turn — you watch
+// their moves land via onSnapshot but can't act until it comes around.
+function isMyTurn() {
+  if (!G) return false;
+  const p = G.players[G.turn];
+  if (!p || p.ai) return false;
+  if (!ROOM) return true;                        // offline: any non-AI turn is yours
+  // Online: seat must match this browser. An unclaimed human seat
+  // (clientId null — host flipped an AI slot to Human after seats were set)
+  // falls to the host so the game doesn't soft-lock waiting for nobody.
+  if (p.clientId === null) return IS_HOST;
+  return p.clientId === CLIENT_ID;
+}
+
+// ============================================================================
 // TUTORIAL SYSTEM
 // ============================================================================
 
@@ -1707,6 +2022,10 @@ function newGame(playerConfigs, difficulty = 'medium') {
     name: cfg.name || COLOR_NAMES[i],
     color: COLORS[i],
     ai: cfg.ai,
+    // Which browser controls this seat. null = offline/AI (anyone at the
+    // keyboard). Online human seat = that joiner's CLIENT_ID. isMyTurn()
+    // compares this to our own CLIENT_ID to gate inputs.
+    clientId: cfg.clientId || null,
     house: houses[i],
     gold: STARTING_GOLD,
     eliminated: false,
@@ -1760,7 +2079,7 @@ function newGame(playerConfigs, difficulty = 'medium') {
   for (let i = 0; i < n; i++) turnOrder.push(players[(firstPlayer + i) % n].name);
   log(G, `Initiative: ${players[firstPlayer].name} goes first. Turn order: ${turnOrder.join(' → ')}`, 'turn');
 
-  render();
+  commit();   // initial push — remote clients' onSnapshot fires with the fresh game
 
   // Auto-place AI castles if current turn is AI
   maybeRunAI();
@@ -2777,6 +3096,10 @@ function startPlayerTurn(g, p) {
 
 function maybeRunAI() {
   if (G._eventRevealOpen) return; // wait for the player to read the card
+  // Online: only the host's browser runs AI. Other clients watch AI turns
+  // arrive via snapshot. Without this, every client would run the AI
+  // simultaneously and you'd get N divergent commits racing each other.
+  if (ROOM && !IS_HOST) return;
   const p = G.players[G.turn];
   if (!p || p.eliminated || !p.ai || G.phase === 'over') return;
 
@@ -2794,13 +3117,13 @@ function maybeRunAI() {
       h.holding = { type: 'castle', owner: p.id, damage: 0 };
       log(G, `${p.name} places castle at (${h.q},${h.r})`);
       advancePhase();
-      render();
+      commit();   // push each AI placement so remote players watch it happen
       maybeRunAI();
     } else if (G.phase === 'act') {
       aiAct(G, p);   // move units
       aiSpend(G, p); // then build (same timing as humans)
       advancePhase(); // paySupply + checkSupplyCutoff happen here
-      render();
+      commit();   // one push per AI turn — remote players see the whole turn land atomically
       maybeRunAI();
     }
   }, delay);
@@ -2956,7 +3279,7 @@ function renderHeader() {
     : G.phase === 'over' ? 'Game Over'
     : G.phase;
   document.getElementById('phase-display').innerHTML = `<strong>${phaseText}</strong>`;
-  document.getElementById('btn-end-turn').disabled = G.phase !== 'act' || p.ai;
+  document.getElementById('btn-end-turn').disabled = G.phase !== 'act' || !isMyTurn();
 }
 
 // Both bounds must clamp: darken() is lighten(-amt), so channels can go
@@ -3429,7 +3752,7 @@ function renderSidebar() {
   const ac = document.getElementById('actions-content');
   ac.innerHTML = '';
   const p = G.players[G.turn];
-  if (G.phase === 'act' && !p.ai) {
+  if (G.phase === 'act' && isMyTurn()) {
     if (G.selected && G.selected.unit && G.selected.unit.owner === p.id) {
       if (!G.selected.unit.moved && !G.mode) {
         addBtn(ac, 'Move this unit', () => { G.mode = 'move'; G.validMoves = getValidMoves(G.selected); render(); });
@@ -3453,14 +3776,14 @@ function renderSidebar() {
           addBtn(ac, label, () => {
             executeBowmanAttack(G.selected, tgt, m.type);
             G.mode = null; G.validTargets = null; G.pendingAttackHex = null;
-            render();
+            commit();
           });
         }
       }
       if (G.mode) addBtn(ac, 'Cancel', () => { G.mode = null; G.validMoves = null; G.validTargets = null; G.pendingAttackHex = null; render(); }, 'danger');
     }
     addBtn(ac, 'End Turn', endTurn, 'primary');
-  } else if (G.phase === 'setup-castle' && !p.ai) {
+  } else if (G.phase === 'setup-castle' && isMyTurn()) {
     ac.innerHTML = '<div style="font-size:12px;color:var(--text-dim)">Click a grassland hex to place your castle</div>';
   }
 
@@ -3483,7 +3806,7 @@ function renderBuy() {
   const bc = document.getElementById('buy-content');
   bc.innerHTML = '';
   const p = G.players[G.turn];
-  if (G.phase !== 'act' || p.ai) { bc.innerHTML = '<span style="font-size:11px;color:var(--text-dim)">—</span>'; return; }
+  if (G.phase !== 'act' || !isMyTurn()) { bc.innerHTML = '<span style="font-size:11px;color:var(--text-dim)">—</span>'; return; }
 
   const makeRow = (label, disabled, why, onBuy) => {
     const span = document.createElement('span');
@@ -3524,7 +3847,7 @@ function renderBuy() {
     const doom = spawnDoomed ? ' ⚠ NO SUPPLY' : '';
     makeRow(`${type} — ${unitCost(G, type)}g${where}${siege}${doom}`, spawnDoomed,
       spawnDoomed ? `Unit would die — ${spawnAt.holding.type} has no supply line to castle/village` : '',
-      () => { buildUnit(G, p, type, spawnAt); render(); });
+      () => { buildUnit(G, p, type, spawnAt); commit(); });
   });
   if (spawns.length > 1 && !selectedSpawn) {
     const hint = document.createElement('div');
@@ -3544,7 +3867,7 @@ function renderBuy() {
       hex.holding = { type: 'outpost', owner: p.id, damage: 0 };
       G.componentsUsed.outpost++;
       log(G, `${p.name} builds an outpost`, 'build');
-      render();
+      commit();
     });
   }
 
@@ -3562,7 +3885,7 @@ function renderBuy() {
       hex.holding = { type: 'village', owner: p.id, damage: dmg };
       G.componentsUsed.village++;
       log(G, `${p.name} upgrades an outpost to a village`, 'build');
-      render();
+      commit();
     });
   }
 }
@@ -3571,7 +3894,7 @@ function renderNegotiate() {
   const nc = document.getElementById('negotiate-content');
   nc.innerHTML = '';
   const p = G.players[G.turn];
-  if (G.phase !== 'act' || p.ai || G.eventFlags.noNegotiate) {
+  if (G.phase !== 'act' || !isMyTurn() || G.eventFlags.noNegotiate) {
     nc.innerHTML = '<span style="font-size:11px;color:var(--text-dim)">' + (G.eventFlags.noNegotiate ? 'Royal Envoy: no negotiation' : '—') + '</span>';
     return;
   }
@@ -3602,7 +3925,7 @@ function renderNegotiate() {
     } else {
       log(G, `${target.name} refuses passage`);
     }
-    render();
+    commit();
   });
 
   addBtn(nc, 'Give gold (no conditions)', () => {
@@ -3612,13 +3935,15 @@ function renderNegotiate() {
     p.gold -= g;
     G.players[targetId].gold += g;
     log(G, `${p.name} gives ${G.players[targetId].name} ${g}g`);
-    render();
+    commit();
   });
 }
 
 function onHexClick(hex) {
   const p = G.players[G.turn];
-  if (p.ai) return;
+  // Offline this is just "not during AI turns." Online it's "not during
+  // anyone else's turn" — you watch their moves land via snapshot.
+  if (!isMyTurn()) return;
 
   if (G.phase === 'setup-castle') {
     const v = validateCastlePlacement(G, hex);
@@ -3626,7 +3951,7 @@ function onHexClick(hex) {
     hex.holding = { type: 'castle', owner: p.id, damage: 0 };
     log(G, `${p.name} places castle at (${hex.q},${hex.r})`);
     advancePhase();
-    render();
+    commit();        // → board changed, everyone needs to see it
     maybeRunAI();
     return;
   }
@@ -3638,7 +3963,7 @@ function onHexClick(hex) {
     if (target) {
       executeMove(G.selected, hex, target.path);
       G.mode = null; G.validMoves = null; G.selected = hex.unit ? hex : null;
-      render();
+      commit();      // → unit moved, fief flipped, maybe combat happened
       return;
     }
   }
@@ -3647,23 +3972,24 @@ function onHexClick(hex) {
     if (matches.length === 1) {
       executeBowmanAttack(G.selected, hex, matches[0].type);
       G.mode = null; G.validTargets = null; G.pendingAttackHex = null;
-      render();
+      commit();      // → arrow fired, something probably died
       return;
     } else if (matches.length > 1) {
       // Multiple target types on same hex (e.g. enemy unit + enemy holding).
       // Sidebar will show explicit buttons for each.
       G.pendingAttackHex = hex;
-      render();
+      render();      // local only — this is target disambiguation UI
       return;
     }
   }
 
   G.selected = hex;
   G.mode = null; G.validMoves = null; G.validTargets = null;
-  render();
+  render();          // local only — selection is your cursor, not game state
 }
 
 function endTurn() {
+  if (!isMyTurn()) return;   // button is disabled but this also guards the sidebar End Turn button
   const p = G.players[G.turn];
   // Heads-up for humans: warn if ending turn with less gold than current supply
   // needs. AI movement between now and Upkeep may make it even worse.
@@ -3680,7 +4006,7 @@ function endTurn() {
   }
   G.selected = null; G.mode = null; G.validMoves = null; G.validTargets = null; G.pendingAttackHex = null;
   advancePhase();
-  render();
+  commit();          // → turn handed off (possibly with siege/heal/event draw cascading)
   maybeRunAI();
 }
 
@@ -3779,6 +4105,151 @@ function showVictory(v) {
 }
 
 // ============================================================================
+// LOBBY — create/join an online room, or play offline
+// ============================================================================
+
+// Seats claimed in the current room (join order). Each is {clientId, name}.
+// Seat 0 is always the host. Populated from the room doc's snapshot listener.
+let ROOM_SEATS = [];
+
+function makeRoomCode() {
+  // 6 chars, no ambiguous glyphs (0/O, 1/I/L)
+  const alphabet = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+  let s = '';
+  for (let i = 0; i < 6; i++) s += alphabet[Math.floor(Math.random() * alphabet.length)];
+  return s;
+}
+
+async function createRoom() {
+  if (!DB) return;
+  const code = makeRoomCode();
+  const myName = prompt('Your name?', COLOR_NAMES[0]) || COLOR_NAMES[0];
+  try {
+    await DB.collection('games').doc(code).set({
+      hostId: CLIENT_ID,
+      seats: [{ clientId: CLIENT_ID, name: myName }],
+      state: null,
+      createdAt: Date.now(),
+    });
+    IS_HOST = true;
+    subscribeToRoom(code);
+    enterLobbyRoom(code);
+  } catch (e) {
+    console.error('[lobby] create failed', e);
+    alert('Could not create room. Check Firebase config/rules.');
+  }
+}
+
+async function joinRoom(code) {
+  if (!DB) return;
+  code = code.trim().toUpperCase();
+  if (!code) return;
+  try {
+    const doc = await DB.collection('games').doc(code).get();
+    if (!doc.exists) { alert('Room not found'); return; }
+    const data = doc.data();
+    if (data.state) { alert('Game already started'); return; }
+    const already = (data.seats || []).some(s => s.clientId === CLIENT_ID);
+    if ((data.seats || []).length >= 6 && !already) { alert('Room full (6 seats max)'); return; }
+
+    if (!already) {
+      const myName = prompt('Your name?', COLOR_NAMES[(data.seats || []).length]) || 'Player';
+      // arrayUnion makes this idempotent — double-click won't add you twice
+      await DB.collection('games').doc(code).update({
+        seats: firebase.firestore.FieldValue.arrayUnion({ clientId: CLIENT_ID, name: myName })
+      });
+    }
+    IS_HOST = (data.hostId === CLIENT_ID);
+    subscribeToRoom(code);
+    enterLobbyRoom(code);
+  } catch (e) {
+    console.error('[lobby] join failed', e);
+    alert('Could not join room.');
+  }
+}
+
+function enterLobbyRoom(code) {
+  document.getElementById('lobby-landing').style.display = 'none';
+  document.getElementById('lobby-room').style.display = 'block';
+  document.getElementById('lobby-room-code').textContent = code;
+  document.getElementById('lobby-start').style.display = IS_HOST ? 'block' : 'none';
+  document.getElementById('lobby-wait').style.display = IS_HOST ? 'none' : 'block';
+
+  // Listen for seat changes AND game start — piggyback on the existing
+  // room snapshot subscription. applySnapshot handles state!=null (game on);
+  // this extra listener handles seats during lobby.
+  DB.collection('games').doc(code).onSnapshot(doc => {
+    const data = doc.data();
+    if (!data) return;
+    ROOM_SEATS = data.seats || [];
+    renderLobbySeats();
+    // Game started remotely → close lobby, the main applySnapshot handles the rest
+    if (data.state) {
+      document.getElementById('lobby-modal').style.display = 'none';
+    }
+  });
+}
+
+function renderLobbySeats() {
+  const el = document.getElementById('lobby-seats');
+  el.innerHTML = '';
+  ROOM_SEATS.forEach((s, i) => {
+    const row = document.createElement('div');
+    row.className = 'row';
+    const you = s.clientId === CLIENT_ID ? ' <span style="color:var(--gold-dark);font-weight:700">(you)</span>' : '';
+    const host = i === 0 ? ' <span style="font-size:10px;color:var(--ink-faint)">HOST</span>' : '';
+    row.innerHTML = `
+      <span class="color-dot" style="background:${COLORS[i]}"></span>
+      <span style="flex:1;font-weight:600">${s.name}${you}${host}</span>
+    `;
+    el.appendChild(row);
+  });
+  if (!ROOM_SEATS.length) el.innerHTML = '<div style="font-style:italic;color:var(--ink-faint);text-align:center">Waiting for players…</div>';
+}
+
+function initLobby() {
+  const online = !!DB;
+  // Hide online buttons if Firebase isn't configured
+  if (!online) {
+    document.getElementById('lobby-create').style.display = 'none';
+    document.getElementById('lobby-join').style.display = 'none';
+    document.getElementById('lobby-code').style.display = 'none';
+  } else {
+    document.getElementById('lobby-offline-note').style.display = 'none';
+  }
+
+  document.getElementById('lobby-offline').onclick = () => {
+    leaveRoom();
+    document.getElementById('lobby-modal').style.display = 'none';
+    document.getElementById('setup-modal').style.display = 'flex';
+  };
+  document.getElementById('lobby-create').onclick = createRoom;
+  document.getElementById('lobby-join').onclick = () => {
+    joinRoom(document.getElementById('lobby-code').value);
+  };
+  document.getElementById('lobby-code').onkeydown = (e) => {
+    if (e.key === 'Enter') joinRoom(e.target.value);
+  };
+  document.getElementById('lobby-leave').onclick = () => {
+    leaveRoom();
+    document.getElementById('lobby-room').style.display = 'none';
+    document.getElementById('lobby-landing').style.display = 'block';
+  };
+  document.getElementById('lobby-start').onclick = () => {
+    if (!IS_HOST) return;
+    // Host proceeds to setup — but seats are already claimed, so the setup
+    // modal will show claimed seats as locked-to-Human and remaining slots
+    // as AI-by-default.
+    document.getElementById('lobby-modal').style.display = 'none';
+    document.getElementById('setup-modal').style.display = 'flex';
+    // Pre-fill player count to at-least the number of claimed seats
+    const countSel = document.getElementById('setup-count');
+    if (ROOM_SEATS.length > +countSel.value) countSel.value = Math.min(6, ROOM_SEATS.length);
+    countSel.dispatchEvent(new Event('change'));
+  };
+}
+
+// ============================================================================
 // SETUP MODAL
 // ============================================================================
 
@@ -3790,14 +4261,23 @@ function initSetupModal() {
     const n = +countSel.value;
     slotsDiv.innerHTML = '';
     for (let i = 0; i < n; i++) {
+      // If this seat is claimed by an online player, lock it to Human with
+      // their name. Unclaimed seats default to AI (host can flip them).
+      const claimed = ROOM && ROOM_SEATS[i];
+      const locked = claimed ? 'disabled' : '';
+      const nameVal = claimed ? ROOM_SEATS[i].name : COLOR_NAMES[i];
+      const aiSelected = !claimed && i >= ROOM_SEATS.length ? 'selected' : '';
+      const humanSelected = claimed ? 'selected' : '';
+      const claimedTag = claimed ? ` <span style="font-size:10px;color:var(--gold-dark)">● online</span>` : '';
+
       const row = document.createElement('div');
       row.className = 'row';
       row.innerHTML = `
-        <label><span class="color-dot" style="background:${COLORS[i]}"></span> Player ${i+1}</label>
-        <input type="text" id="slot-name-${i}" value="${COLOR_NAMES[i]}" style="width:120px">
-        <select id="slot-type-${i}">
-          <option value="human">Human</option>
-          <option value="ai" ${i > 0 ? 'selected' : ''}>Computer</option>
+        <label><span class="color-dot" style="background:${COLORS[i]}"></span> Player ${i+1}${claimedTag}</label>
+        <input type="text" id="slot-name-${i}" value="${nameVal}" style="width:120px" ${locked}>
+        <select id="slot-type-${i}" ${locked}>
+          <option value="human" ${humanSelected}>Human</option>
+          <option value="ai" ${aiSelected}>Computer</option>
         </select>
       `;
       slotsDiv.appendChild(row);
@@ -3811,9 +4291,13 @@ function initSetupModal() {
     const difficulty = document.getElementById('setup-difficulty').value;
     const cfgs = [];
     for (let i = 0; i < n; i++) {
+      const claimed = ROOM && ROOM_SEATS[i];
       cfgs.push({
         name: document.getElementById(`slot-name-${i}`).value || COLOR_NAMES[i],
-        ai: document.getElementById(`slot-type-${i}`).value === 'ai'
+        ai: document.getElementById(`slot-type-${i}`).value === 'ai',
+        // Bake the claiming browser's ID into the seat — isMyTurn() checks this.
+        // Offline (ROOM=null) or unclaimed seat → null, meaning "any human."
+        clientId: claimed ? claimed.clientId : null,
       });
     }
     document.getElementById('setup-modal').style.display = 'none';
@@ -3832,7 +4316,12 @@ function initSetupModal() {
   };
 
   document.getElementById('btn-new-game').onclick = () => {
-    document.getElementById('setup-modal').style.display = 'flex';
+    // Back to the top — lobby decides offline vs online path
+    leaveRoom();
+    document.getElementById('lobby-landing').style.display = 'block';
+    document.getElementById('lobby-room').style.display = 'none';
+    document.getElementById('lobby-modal').style.display = 'flex';
+    document.getElementById('setup-modal').style.display = 'none';
   };
   document.getElementById('btn-end-turn').onclick = endTurn;
   document.getElementById('btn-help').onclick = () => {
@@ -3868,6 +4357,7 @@ function shuffle(arr) {
 // ============================================================================
 
 initSetupModal();
+initLobby();
 
 </script>
 </body>
