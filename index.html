@@ -130,6 +130,28 @@
     color: var(--ink-light);
   }
   #header .phase strong { color: var(--ink); }
+
+  /* YOUR TURN — gold-leaf summons that pulses so you can't miss it */
+  #header .phase.your-turn strong {
+    color: var(--gold-dark);
+    text-shadow: 0 0 8px rgba(201,162,39,0.5);
+    animation: turnPulse 2s ease-in-out infinite;
+  }
+  @keyframes turnPulse {
+    0%, 100% { text-shadow: 0 0 8px rgba(201,162,39,0.5); }
+    50%      { text-shadow: 0 0 16px rgba(201,162,39,0.9), 0 0 4px rgba(201,162,39,1); }
+  }
+
+  /* Waiting — muted, with a soft breathing dot so you know the page isn't
+     frozen, just idle. The animation on the color dot is the "heartbeat." */
+  #header .phase.waiting { color: var(--ink-faint); }
+  #header .phase.waiting strong { color: var(--ink-light); }
+  #header .phase.waiting .color-dot { animation: waitBreathe 1.6s ease-in-out infinite; }
+  @keyframes waitBreathe {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50%      { opacity: 0.5; transform: scale(0.85); }
+  }
+
   #header .spacer { flex: 1; }
 
   /* Buttons styled as pressed wax seals / stamped brass plates */
@@ -1886,7 +1908,9 @@ function applySnapshot(doc) {
   // Preserve local selection across hydrate — the hex OBJECTS are replaced
   // (new array from Firestore), so the old ref is dead, but coords are stable.
   const selCoords = G && G.selected ? { q: G.selected.q, r: G.selected.r } : null;
-  const hadEventOpen = G && G._eventRevealOpen;
+  // Capture OLD round number to detect round-boundary snapshots. Can't use
+  // G._eventRevealOpen — that's per-client UI state that hydrate wipes.
+  const prevRound = G ? G.round : 0;
 
   G = hydrate(incoming);
   if (selCoords) G.selected = G.hexMap[hexKey(selCoords.q, selCoords.r)] || null;
@@ -1904,14 +1928,20 @@ function applySnapshot(doc) {
   }
   logEl.scrollTop = logEl.scrollHeight;
 
-  // If a new round just started remotely, show the event card here too.
-  // hadEventOpen guards against re-showing if we already had it up.
-  if (G.currentEvent && !hadEventOpen && G.phase === 'act') {
-    // Only pop the card if this snapshot is the one that introduced the event —
-    // heuristic: round boundary. Good enough; worst case it shows twice.
-    const lastLog = G.logEntries[G.logEntries.length - 1];
-    const isFreshRound = lastLog && lastLog.msg.startsWith('Event:');
-    if (isFreshRound) showEventReveal(G.currentEvent, G.round);
+  // Event reveal for remote clients. showEventReveal() fires inside
+  // advancePhase() — but advancePhase only runs on ONE client (whoever's
+  // turn ended the round: the last human's browser, or the host if AI was
+  // last). Everyone else needs to detect the round change in the snapshot.
+  //
+  // The old heuristic (lastLog.startsWith('Event:')) failed because
+  // startPlayerTurn() logs AFTER the event draw — the last entry is
+  // "Crimson's turn — collects 8g", not "Event: Winter...".
+  //
+  // Round-number delta is unambiguous: if this snapshot's round > what we
+  // had before hydrate, the round just ticked over. G.currentEvent being
+  // set distinguishes Round 2+ (event drawn) from Round 1 (no event).
+  if (G.round > prevRound && G.currentEvent && G.phase === 'act') {
+    showEventReveal(G.currentEvent, G.round);
   }
 
   render();
@@ -3288,11 +3318,29 @@ function renderProgress() {
 
 function renderHeader() {
   const p = G.players[G.turn];
-  const phaseText = G.phase === 'setup-castle' ? `Setup — ${p.name} place castle`
-    : G.phase === 'act' ? `Round ${G.round} — ${p.name}'s turn`
-    : G.phase === 'over' ? 'Game Over'
-    : G.phase;
-  document.getElementById('phase-display').innerHTML = `<strong>${phaseText}</strong>`;
+  const el = document.getElementById('phase-display');
+  el.classList.remove('your-turn', 'waiting');
+
+  if (G.phase === 'over') {
+    el.innerHTML = '<strong>Game Over</strong>';
+  } else if (isMyTurn()) {
+    // Speak to the player, not about them. "Crimson's turn" reads as a
+    // spectator caption; "YOUR TURN" reads as a summons. Same state,
+    // different relationship to it.
+    const what = G.phase === 'setup-castle' ? 'Place your castle' : `Round ${G.round}`;
+    el.innerHTML = `<strong>YOUR TURN</strong> — ${what}`;
+    el.classList.add('your-turn');
+  } else {
+    // Waiting on someone else. Show WHO and WHY they're slow — AI is thinking
+    // vs a human is thinking. The color dot is what your eye latches onto at
+    // a glance; the words are confirmation.
+    const dot = `<span class="color-dot" style="background:${p.color};vertical-align:-1px;margin:0 4px"></span>`;
+    const who = p.ai ? `${p.name} (AI)` : p.name;
+    const what = G.phase === 'setup-castle' ? 'to place their castle' : `· Round ${G.round}`;
+    el.innerHTML = `Waiting for ${dot}<strong>${who}</strong> ${what}`;
+    el.classList.add('waiting');
+  }
+
   document.getElementById('btn-end-turn').disabled = G.phase !== 'act' || !isMyTurn();
 }
 
