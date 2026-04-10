@@ -942,6 +942,8 @@
       <h1>NOBLES</h1>
       <div class="phase" id="phase-display">Setup</div>
       <div class="spacer"></div>
+      <span id="room-code-display" style="display:none;font-family:Cinzel,serif;font-size:12px;letter-spacing:2px;color:var(--gold-dark);padding:4px 10px;background:var(--parch-mid);border-radius:3px;cursor:pointer" title="Click to copy room code"></span>
+      <button id="btn-players" style="display:none">Players</button>
       <button id="btn-help">Rules</button>
       <button id="btn-houses">Houses</button>
       <button id="btn-new-game">New Game</button>
@@ -1379,6 +1381,19 @@
       <button onclick="document.getElementById('victory-modal').style.display='none'">Close</button>
       <button class="primary" onclick="location.reload()">New Game</button>
     </div>
+  </div>
+</div>
+
+<!-- Rejoin modal — shown when joining a room with an active game -->
+<div id="rejoin-modal" class="modal-overlay" style="display:none">
+  <div class="modal" style="max-width:500px">
+    <h2>Rejoin Game</h2>
+    <div style="text-align:center;margin-bottom:16px">
+      <div style="font-size:11px;color:var(--ink-faint);letter-spacing:1px">ROOM CODE</div>
+      <div id="rejoin-room-code" style="font-family:Cinzel,serif;font-size:24px;font-weight:900;letter-spacing:4px;color:var(--gold-dark)"></div>
+    </div>
+    <div id="rejoin-content" style="margin-bottom:16px"></div>
+    <div id="rejoin-actions" class="actions"></div>
   </div>
 </div>
 
@@ -1987,6 +2002,7 @@ function applySnapshot(doc) {
   }
 
   render();
+  updateRoomCodeDisplay();
 
   // If the remote turn-end handed control to an AI, and WE'RE the host,
   // we need to run it. (Remote clients don't — they just watch.)
@@ -1997,6 +2013,7 @@ function leaveRoom() {
   if (ROOM_UNSUB) { ROOM_UNSUB(); ROOM_UNSUB = null; }
   ROOM = null;
   IS_HOST = false;
+  updateRoomCodeDisplay();
 }
 
 // Turn guard. Offline: the existing p.ai check handles everything (you are
@@ -4508,7 +4525,15 @@ async function joinRoom(code) {
     const doc = await DB.collection('games').doc(code).get();
     if (!doc.exists) { alert('Room not found'); return; }
     const data = doc.data();
-    if (data.state) { alert('Game already started'); return; }
+
+    // Game already started — show rejoin modal
+    if (data.state) {
+      IS_HOST = (data.hostId === CLIENT_ID);
+      ROOM = code;
+      showRejoinModal(code, data);
+      return;
+    }
+
     const already = (data.seats || []).some(s => s.clientId === CLIENT_ID);
     if ((data.seats || []).length >= 6 && !already) { alert('Room full (6 seats max)'); return; }
 
@@ -4610,6 +4635,237 @@ function initLobby() {
 }
 
 // ============================================================================
+// REJOIN — join an in-progress game
+// ============================================================================
+
+function showRejoinModal(code, data) {
+  const state = data.state;
+  const players = state.players || [];
+
+  document.getElementById('rejoin-room-code').textContent = code;
+  const content = document.getElementById('rejoin-content');
+  const actions = document.getElementById('rejoin-actions');
+
+  // Check if this client already has a seat
+  const mySeat = players.findIndex(p => p.clientId === CLIENT_ID);
+
+  // Find AI players that can be taken over
+  const aiPlayers = players.map((p, i) => ({ ...p, idx: i })).filter(p => p.ai && !p.eliminated);
+
+  // Find OPEN seats (host has marked for reassignment)
+  const openSeats = players.map((p, i) => ({ ...p, idx: i }))
+    .filter(p => !p.ai && !p.eliminated && p.clientId === 'OPEN');
+
+  // Find disconnected human players (clientId set but not the host, not OPEN, and could be reassigned)
+  const disconnectedPlayers = players.map((p, i) => ({ ...p, idx: i }))
+    .filter(p => !p.ai && !p.eliminated && p.clientId && p.clientId !== CLIENT_ID && p.clientId !== data.hostId && p.clientId !== 'OPEN');
+
+  let html = '';
+
+  if (mySeat >= 0) {
+    // Player already has a seat — rejoin directly
+    html = `
+      <div style="text-align:center;padding:12px;background:var(--parch-mid);border-radius:6px;margin-bottom:12px">
+        <div style="font-size:12px;color:var(--ink-faint)">Your seat</div>
+        <div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-top:6px">
+          <span class="color-dot" style="background:${COLORS[mySeat]}"></span>
+          <span style="font-weight:700;font-size:16px">${players[mySeat].name}</span>
+        </div>
+      </div>
+      <p style="text-align:center;color:var(--ink-light);font-size:13px">Welcome back! Click below to rejoin the game.</p>
+    `;
+    actions.innerHTML = `
+      <button onclick="document.getElementById('rejoin-modal').style.display='none';document.getElementById('lobby-modal').style.display='none'">Cancel</button>
+      <button class="primary" onclick="executeRejoin('${code}', ${mySeat})">Rejoin Game</button>
+    `;
+  } else if (openSeats.length > 0) {
+    // Open seats available (host marked for reassignment)
+    html = `<p style="margin-bottom:12px">The host has opened a seat for you to claim:</p>`;
+    html += `<div style="display:flex;flex-direction:column;gap:8px">`;
+    for (const p of openSeats) {
+      html += `
+        <div class="row" style="background:var(--parch-mid);padding:8px 12px;border-radius:4px;cursor:pointer"
+             onclick="executeClaimSeat('${code}', ${p.idx})"
+             onmouseover="this.style.background='var(--parch)'"
+             onmouseout="this.style.background='var(--parch-mid)'">
+          <span class="color-dot" style="background:${COLORS[p.idx]}"></span>
+          <span style="flex:1;font-weight:600">${p.name}</span>
+          <span style="font-size:11px;color:var(--success)">Open seat</span>
+          <span style="color:var(--gold-dark);font-size:12px">Claim →</span>
+        </div>
+      `;
+    }
+    html += `</div>`;
+    actions.innerHTML = `<button onclick="document.getElementById('rejoin-modal').style.display='none'">Cancel</button>`;
+  } else if (aiPlayers.length > 0) {
+    // No seat but AI players available to take over
+    html = `<p style="margin-bottom:12px">No seat found for you, but you can take over a computer player:</p>`;
+    html += `<div style="display:flex;flex-direction:column;gap:8px">`;
+    for (const p of aiPlayers) {
+      html += `
+        <div class="row" style="background:var(--parch-mid);padding:8px 12px;border-radius:4px;cursor:pointer"
+             onclick="executeTakeover('${code}', ${p.idx})"
+             onmouseover="this.style.background='var(--parch)'"
+             onmouseout="this.style.background='var(--parch-mid)'">
+          <span class="color-dot" style="background:${COLORS[p.idx]}"></span>
+          <span style="flex:1;font-weight:600">${p.name}</span>
+          <span style="font-size:11px;color:var(--ink-faint)">Computer</span>
+          <span style="color:var(--gold-dark);font-size:12px">Take Over →</span>
+        </div>
+      `;
+    }
+    html += `</div>`;
+    actions.innerHTML = `<button onclick="document.getElementById('rejoin-modal').style.display='none'">Cancel</button>`;
+  } else {
+    // No seat and no AI to take over — spectator only
+    html = `
+      <p style="text-align:center;color:var(--ink-light)">
+        This game is full with no available seats.<br>
+        You can watch as a spectator.
+      </p>
+    `;
+    actions.innerHTML = `
+      <button onclick="document.getElementById('rejoin-modal').style.display='none'">Cancel</button>
+      <button class="primary" onclick="executeSpectate('${code}')">Watch Game</button>
+    `;
+  }
+
+  // Host can reassign disconnected players
+  if (IS_HOST && disconnectedPlayers.length > 0) {
+    html += `
+      <div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--border)">
+        <div style="font-size:11px;color:var(--ink-faint);margin-bottom:8px">HOST: Reassign disconnected players</div>
+        <div id="rejoin-disconnected" style="display:flex;flex-direction:column;gap:6px">
+    `;
+    for (const p of disconnectedPlayers) {
+      html += `
+        <div class="row" style="background:var(--parch-dark);padding:6px 10px;border-radius:4px">
+          <span class="color-dot" style="background:${COLORS[p.idx]}"></span>
+          <span style="flex:1">${p.name}</span>
+          <span style="font-size:10px;color:var(--danger)">disconnected</span>
+          <button style="font-size:10px;padding:3px 8px" onclick="hostReassignSeat('${code}', ${p.idx})">Reassign</button>
+          <button style="font-size:10px;padding:3px 8px" onclick="hostConvertToAI('${code}', ${p.idx})">Make AI</button>
+        </div>
+      `;
+    }
+    html += `</div></div>`;
+  }
+
+  content.innerHTML = html;
+  document.getElementById('lobby-modal').style.display = 'none';
+  document.getElementById('rejoin-modal').style.display = 'flex';
+}
+
+async function executeRejoin(code, seatIdx) {
+  document.getElementById('rejoin-modal').style.display = 'none';
+  subscribeToRoom(code);
+}
+
+async function executeTakeover(code, seatIdx) {
+  if (!DB) return;
+  try {
+    const myName = prompt('Your name?', COLOR_NAMES[seatIdx]) || 'Player';
+    const doc = await DB.collection('games').doc(code).get();
+    const data = doc.data();
+    const state = data.state;
+
+    // Update the player at seatIdx to be human with this client's ID
+    state.players[seatIdx].ai = false;
+    state.players[seatIdx].clientId = CLIENT_ID;
+    state.players[seatIdx].name = myName;
+
+    await DB.collection('games').doc(code).update({ state });
+
+    document.getElementById('rejoin-modal').style.display = 'none';
+    subscribeToRoom(code);
+  } catch (e) {
+    console.error('[rejoin] takeover failed', e);
+    alert('Could not take over seat.');
+  }
+}
+
+async function executeClaimSeat(code, seatIdx) {
+  if (!DB) return;
+  try {
+    const doc = await DB.collection('games').doc(code).get();
+    const data = doc.data();
+    const state = data.state;
+    const currentName = state.players[seatIdx].name;
+
+    const myName = prompt('Your name?', currentName) || currentName;
+
+    // Claim the OPEN seat
+    state.players[seatIdx].clientId = CLIENT_ID;
+    state.players[seatIdx].name = myName;
+
+    await DB.collection('games').doc(code).update({ state });
+
+    document.getElementById('rejoin-modal').style.display = 'none';
+    subscribeToRoom(code);
+  } catch (e) {
+    console.error('[rejoin] claim seat failed', e);
+    alert('Could not claim seat.');
+  }
+}
+
+async function executeSpectate(code) {
+  document.getElementById('rejoin-modal').style.display = 'none';
+  subscribeToRoom(code);
+  // Spectators just watch — isMyTurn will always return false
+}
+
+async function hostReassignSeat(code, seatIdx) {
+  if (!DB || !IS_HOST) return;
+  const newClientId = prompt('Enter the new player\'s client ID (they can find it in browser console), or leave empty to let the next person who joins claim it:');
+  if (newClientId === null) return; // cancelled
+
+  try {
+    const doc = await DB.collection('games').doc(code).get();
+    const state = doc.data().state;
+
+    if (newClientId.trim()) {
+      // Assign to specific client
+      state.players[seatIdx].clientId = newClientId.trim();
+    } else {
+      // Clear clientId — next joiner can claim via "Take Over" if we also set ai=true temporarily
+      // Actually, let's just set clientId to a special "OPEN" marker
+      state.players[seatIdx].clientId = 'OPEN';
+    }
+
+    await DB.collection('games').doc(code).update({ state });
+    alert('Seat reassigned. The player can now rejoin with the room code.');
+    // Refresh the modal
+    const docRefresh = await DB.collection('games').doc(code).get();
+    showRejoinModal(code, docRefresh.data());
+  } catch (e) {
+    console.error('[rejoin] reassign failed', e);
+    alert('Could not reassign seat.');
+  }
+}
+
+async function hostConvertToAI(code, seatIdx) {
+  if (!DB || !IS_HOST) return;
+  if (!confirm('Convert this player to AI? They will lose control of their units.')) return;
+
+  try {
+    const doc = await DB.collection('games').doc(code).get();
+    const state = doc.data().state;
+
+    state.players[seatIdx].ai = true;
+    state.players[seatIdx].clientId = null;
+
+    await DB.collection('games').doc(code).update({ state });
+    alert('Player converted to AI.');
+    // Refresh the modal
+    const docRefresh = await DB.collection('games').doc(code).get();
+    showRejoinModal(code, docRefresh.data());
+  } catch (e) {
+    console.error('[rejoin] convert to AI failed', e);
+    alert('Could not convert to AI.');
+  }
+}
+
+// ============================================================================
 // SETUP MODAL
 // ============================================================================
 
@@ -4699,6 +4955,38 @@ function initSetupModal() {
     }).join('');
     document.getElementById('houses-modal').style.display = 'flex';
   };
+
+  // Room code display — click to copy
+  document.getElementById('room-code-display').onclick = () => {
+    if (ROOM) {
+      navigator.clipboard.writeText(ROOM).then(() => {
+        const el = document.getElementById('room-code-display');
+        const orig = el.textContent;
+        el.textContent = 'Copied!';
+        setTimeout(() => el.textContent = orig, 1500);
+      });
+    }
+  };
+
+  // Players button — show management modal for host
+  document.getElementById('btn-players').onclick = async () => {
+    if (!ROOM || !DB) return;
+    const doc = await DB.collection('games').doc(ROOM).get();
+    showRejoinModal(ROOM, doc.data());
+  };
+}
+
+function updateRoomCodeDisplay() {
+  const el = document.getElementById('room-code-display');
+  const btn = document.getElementById('btn-players');
+  if (ROOM) {
+    el.textContent = ROOM;
+    el.style.display = 'inline';
+    btn.style.display = IS_HOST ? 'inline' : 'none';
+  } else {
+    el.style.display = 'none';
+    btn.style.display = 'none';
+  }
 }
 
 // ============================================================================
