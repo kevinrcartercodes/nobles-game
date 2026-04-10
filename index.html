@@ -201,6 +201,7 @@
     box-shadow: inset 0 1px 3px rgba(0,0,0,0.1), 0 0 0 1px var(--gold-light), 0 2px 6px rgba(201,162,39,0.3);
   }
   .prog-player.eliminated { opacity: 0.35; filter: grayscale(0.6); }
+  .prog-player.castle-lost { border-color: var(--danger); box-shadow: inset 0 0 8px rgba(165,40,40,0.3); }
   .prog-name { font-family: 'Cinzel', serif; font-size: 10px; font-weight: 700; display: flex; align-items: center; gap: 5px; color: var(--ink); }
   .prog-row { display: flex; align-items: center; gap: 4px; }
   .prog-label { font-size: 9px; font-weight: 600; color: var(--ink-faint); width: 28px; text-transform: uppercase; letter-spacing: 0.5px; }
@@ -1432,7 +1433,13 @@
       Bowmen contribute <b>unless</b> they fired their ranged attack elsewhere this round.<br>
       Fighting your way to the adjacent tile still counts — position matters, not how you got there.<br>
       <b>Heals +1/round</b> only if no enemy on top (adjacent enemies don't block heal).<br>
-      Pop 0 + your unit on it = <b>captured</b>. Capturing a Castle eliminates that player.</p>
+      Pop 0 + your unit on it = <b>captured</b>.</p>
+
+      <h3 style="color:var(--accent);margin-top:12px">Losing Your Castle</h3>
+      <p>When your castle is captured, you <b>keep playing</b> — your gold, color, units, and other holdings remain.<br>
+      <b>No income:</b> you skip gold collection each turn until you recapture a castle.<br>
+      <b>Supply still applies:</b> units must reach a Village (or recapture a castle) or they die. Supply costs still deduct from your gold.<br>
+      <b>Recapture:</b> whoever has a unit on a castle when it falls takes it — including the original owner.</p>
 
       <h3 style="color:var(--accent);margin-top:12px">Building</h3>
       <p><b>Outpost</b> (20g): your unit on your fief + 1-tile spacing.<br>
@@ -1797,6 +1804,7 @@ function serialize(g) {
       house: p.house.key,                  // ref → key
       gold: p.gold,
       eliminated: p.eliminated,
+      castleLost: p.castleLost,
       capturedHolding: p.capturedHolding,
       unitBuiltThisRound: p.unitBuiltThisRound,
       rightOfPassage: [...p.rightOfPassage],  // Set → array
@@ -2042,7 +2050,7 @@ const TUTORIAL_CARDS = {
   },
   siege: {
     title: '🔥 Siege',
-    body: `Sieges tick at <b>end of round</b>: your unit ON an enemy holding = 1 dmg, each adjacent spearman/knight = 1 dmg.<br><br>Hover a building to see <b>🔥-N</b> siege pressure. Pop 0 + your unit on it = captured. Capturing a Castle eliminates that player.`
+    body: `Sieges tick at <b>end of round</b>: your unit ON an enemy holding = 1 dmg, each adjacent spearman/knight = 1 dmg.<br><br>Hover a building to see <b>🔥-N</b> siege pressure. Pop 0 + your unit on it = captured. Lose your castle? You keep playing but earn <b>no income</b> until you recapture one.`
   },
   houses: {
     title: '🏛️ Your House',
@@ -2107,6 +2115,7 @@ function newGame(playerConfigs, difficulty = 'medium') {
     house: houses[i],
     gold: STARTING_GOLD,
     eliminated: false,
+    castleLost: false,
     capturedHolding: false,
     unitBuiltThisRound: false,
     rightOfPassage: new Set(), // player IDs granting passage this round
@@ -2464,7 +2473,18 @@ function checkCapture(hex) {
   G.players[newOwner].capturedHolding = true;
 
   if (hex.holding.type === 'castle') {
-    eliminatePlayer(G.players[oldOwner]);
+    // Old owner loses their castle — they keep playing but can't collect income
+    const oldPlayer = G.players[oldOwner];
+    if (!oldPlayer.castleLost) {
+      oldPlayer.castleLost = true;
+      log(G, `${oldPlayer.name} has LOST THEIR CASTLE — no income until recaptured!`, 'turn');
+    }
+    // New owner regains castle status if they had lost theirs
+    const newPlayer = G.players[newOwner];
+    if (newPlayer.castleLost) {
+      newPlayer.castleLost = false;
+      log(G, `${newPlayer.name} has RECLAIMED A CASTLE — income restored!`, 'turn');
+    }
   }
 }
 
@@ -2744,6 +2764,11 @@ function buildUnit(g, player, type, spawnHex) {
 
 function collectIncome(g, p) {
   // Called at START of each player's turn — income before spending
+  // Players without a castle collect no income
+  if (p.castleLost) {
+    log(g, `${p.name} has no castle — skips income`, 'turn');
+    return 0;
+  }
   let income = calcFees(g, p);
   if (g.eventFlags.taxRevolt) {
     // Compute tax revolt targets lazily
@@ -3552,7 +3577,7 @@ function renderProgress() {
     const pct = (v, max) => Math.min(100, (v / max) * 100);
 
     const div = document.createElement('div');
-    div.className = 'prog-player' + (G.turn === p.id ? ' active' : '') + (p.eliminated ? ' eliminated' : '');
+    div.className = 'prog-player' + (G.turn === p.id ? ' active' : '') + (p.eliminated ? ' eliminated' : '') + (p.castleLost ? ' castle-lost' : '');
     div.innerHTML = `
       <div class="prog-name"><span class="color-dot" style="background:${p.color};width:8px;height:8px"></span>${p.name}</div>
       <div class="prog-row">
