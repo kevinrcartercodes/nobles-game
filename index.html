@@ -1821,7 +1821,7 @@ function serialize(g) {
       eliminated: p.eliminated,
       castleLost: p.castleLost,
       capturedHolding: p.capturedHolding,
-      unitBuiltThisRound: p.unitBuiltThisRound,
+      unitBuildsThisRound: [...(p.unitBuildsThisRound || [])],
       rightOfPassage: [...p.rightOfPassage],  // Set → array
       _usedRoyalFavor: p._usedRoyalFavor || false,
     })),
@@ -2134,7 +2134,7 @@ function newGame(playerConfigs, difficulty = 'medium') {
     eliminated: false,
     castleLost: false,
     capturedHolding: false,
-    unitBuiltThisRound: false,
+    unitBuildsThisRound: [], // hex keys where this player has recruited this round (max 1/holding)
     rightOfPassage: new Set(), // player IDs granting passage this round
   }));
 
@@ -2724,33 +2724,37 @@ function canBuildHolding(g, hex, player, type) {
 }
 
 function getUnitSpawns(g, player) {
-  // All holdings where a unit could appear: castle, village, or outpost
+  // All holdings where a unit could appear: castle, village, or outpost.
   // Not blocked by own unit. Besieged holdings ARE valid (sally-out combat).
+  // Excludes holdings that have already recruited this round — one build per holding.
+  const used = new Set(player.unitBuildsThisRound || []);
   return g.hexes.filter(h =>
     h.holding &&
     h.holding.owner === player.id &&
-    !(h.unit && h.unit.owner === player.id)
+    !(h.unit && h.unit.owner === player.id) &&
+    !used.has(hexKey(h.q, h.r))
   );
 }
 
 function canBuildUnit(g, player, type) {
-  if (player.unitBuiltThisRound) return { ok: false, why: 'Already built a unit this round' };
   const cost = unitCost(g, type);
   if (player.gold < cost) return { ok: false, why: `Need ${cost}g` };
   const spawns = getUnitSpawns(g, player);
-  if (!spawns.length) return { ok: false, why: 'No open holding to recruit at' };
+  if (!spawns.length) return { ok: false, why: 'No holding left to recruit at this round' };
   return { ok: true, cost, spawns };
 }
 
 function buildUnit(g, player, type, spawnHex) {
   // Re-validate at click-time to avoid stale-state bugs
   const cost = unitCost(g, type);
-  if (player.unitBuiltThisRound || player.gold < cost) return;
+  if (player.gold < cost) return;
   if (!spawnHex.holding || spawnHex.holding.owner !== player.id) return;
   if (spawnHex.unit && spawnHex.unit.owner === player.id) return;
+  const key = hexKey(spawnHex.q, spawnHex.r);
+  if ((player.unitBuildsThisRound || []).includes(key)) return;
 
   player.gold -= cost;
-  player.unitBuiltThisRound = true;
+  player.unitBuildsThisRound = [...(player.unitBuildsThisRound || []), key];
   const newUnit = { type, owner: player.id, moved: true, attacked: true };
 
   // Fresh check: is there an enemy on this holding right now?
@@ -2845,7 +2849,7 @@ function doUpkeep(g) {
   // Upkeep just resets per-round flags.
   log(g, `— Upkeep —`, 'turn');
   g.players.forEach(p => {
-    p.unitBuiltThisRound = false;
+    p.unitBuildsThisRound = [];
     p.rightOfPassage.clear();
     p._usedRoyalFavor = false;
   });
@@ -3120,7 +3124,7 @@ function aiSpend(g, p) {
   }
 
   // Priority 3: build a unit
-  if (!p.unitBuiltThisRound) {
+  if (!(p.unitBuildsThisRound || []).length) {
     let type = army < 3 ? 'spearman' : (army % 3 === 0 ? 'knight' : army % 3 === 1 ? 'bowman' : 'spearman');
     const spawns = getUnitSpawns(g, p);
     if (!spawns.length) return;
@@ -3293,7 +3297,7 @@ function aiSpendBrutal(g, p) {
   // Priority 3: Unit. Cheap spearmen for board coverage. Knights only when
   // we're flush (knight+15g buffer) — they're expensive to field and the
   // sim showed knight-rush LOSES (18% win rate, worse than random).
-  if (!p.unitBuiltThisRound) {
+  if (!(p.unitBuildsThisRound || []).length) {
     const spawns = getUnitSpawns(g, p);
     if (!spawns.length) return;
     // Siege-break takes precedence — build the RPS counter
@@ -4134,9 +4138,29 @@ function renderSidebar() {
       if (!G.selected.unit.moved && !G.mode) {
         addBtn(ac, 'Move this unit', () => { G.mode = 'move'; G.validMoves = getValidMoves(G.selected); render(); });
       }
+      // Bowman ranged is gated ONLY on .attacked — movement doesn't consume it.
+      // A bowman that spent its full move budget (including Forced March's +1)
+      // can still shoot as long as it hasn't already fired or entered melee.
       if (G.selected.unit.type === 'bowman' && !G.selected.unit.attacked && !G.mode) {
         const targets = getBowmanTargets(G.selected);
-        if (targets.length) addBtn(ac, 'Ranged attack', () => { G.mode = 'attack'; G.validTargets = targets; G.pendingAttackHex = null; render(); });
+        if (targets.length) {
+          addBtn(ac, 'Ranged attack', () => { G.mode = 'attack'; G.validTargets = targets; G.pendingAttackHex = null; render(); });
+        } else if (G.eventFlags.fog) {
+          const hint = document.createElement('div');
+          hint.style.cssText = 'font-size:11px;color:var(--text-dim);margin:4px 0';
+          hint.textContent = 'Ranged attack: blocked by Fog';
+          ac.appendChild(hint);
+        } else {
+          const hint = document.createElement('div');
+          hint.style.cssText = 'font-size:11px;color:var(--text-dim);margin:4px 0';
+          hint.textContent = 'Ranged attack: no enemy in range';
+          ac.appendChild(hint);
+        }
+      } else if (G.selected.unit.type === 'bowman' && G.selected.unit.attacked && !G.mode) {
+        const hint = document.createElement('div');
+        hint.style.cssText = 'font-size:11px;color:var(--text-dim);margin:4px 0';
+        hint.textContent = 'Ranged attack: already used this turn';
+        ac.appendChild(hint);
       }
       // Disambiguation: hex has both enemy unit AND enemy holding — player must pick
       if (G.mode === 'attack' && G.pendingAttackHex) {
