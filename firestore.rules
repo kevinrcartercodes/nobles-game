@@ -23,12 +23,25 @@ service cloud.firestore {
       return d.keys().hasOnly(['hostId', 'seats', 'state', 'createdAt']);
     }
 
+    // NOTE: Firestore rules cannot measure a document's byte size.
+    // `request.resource.size()` counts KEYS, not bytes — the old
+    // `size() < 50000` check labelled "~50KB limit" never did anything.
+    // The real ceiling is Firestore's own 1 MiB per-document limit, so
+    // we constrain shape instead: a bounded set of top-level keys, a
+    // bounded seat list, and a bounded number of keys inside `state`.
+    function validState(d) {
+      return !('state' in d.keys())
+          || d.state == null
+          || (d.state is map && d.state.keys().size() <= 64);
+    }
+
     function validCreate(d) {
       return knownFields(d)
           && d.keys().hasAll(['hostId', 'seats', 'createdAt'])
           && d.hostId is string && d.hostId.size() <= 64
           && d.seats is list && d.seats.size() <= 6
-          && d.createdAt is number;
+          && d.createdAt is number
+          && validState(d);
     }
 
     match /games/{code} {
@@ -46,7 +59,8 @@ service cloud.firestore {
                     && request.resource.data.seats is list
                     && request.resource.data.seats.size() <= 6
                     && request.resource.data.hostId == resource.data.hostId
-                    && request.resource.data.createdAt == resource.data.createdAt;
+                    && request.resource.data.createdAt == resource.data.createdAt
+                    && validState(request.resource.data);
 
       // The game never deletes rooms.
       allow delete: if false;
