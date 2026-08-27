@@ -1,0 +1,60 @@
+rules_version = '2';
+
+// Rules for the Nobles multiplayer lobby.
+//
+// The game is anonymous — players share a room code, there are no accounts.
+// So these rules cannot stop someone who KNOWS a code from writing to that
+// room. What they do stop: enumerating active rooms, touching anything
+// outside /games, deleting rooms, hijacking a room's host, and using the
+// collection as free storage. See README for the anonymous-auth upgrade
+// that closes the remaining gap.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Room codes are short and uppercase (lobby input is maxlength 6).
+    // Anything else is rejected outright.
+    function validCode(code) {
+      return code.matches('^[A-Z0-9]{4,8}$');
+    }
+
+    // The only four fields the game ever writes.
+    function knownFields(d) {
+      return d.keys().hasOnly(['hostId', 'seats', 'state', 'createdAt']);
+    }
+
+    function validCreate(d) {
+      return knownFields(d)
+          && d.keys().hasAll(['hostId', 'seats', 'createdAt'])
+          && d.hostId is string && d.hostId.size() <= 64
+          && d.seats is list && d.seats.size() <= 6
+          && d.createdAt is number;
+    }
+
+    match /games/{code} {
+      // `get` only. `list` is deliberately NOT granted, so no one can
+      // enumerate active rooms or scrape the collection.
+      allow get: if validCode(code);
+      allow list: if false;
+
+      allow create: if validCode(code) && validCreate(request.resource.data);
+
+      // Seats and state change freely during play; host and creation
+      // time are immutable, so a room can't be taken over.
+      allow update: if validCode(code)
+                    && knownFields(request.resource.data)
+                    && request.resource.data.seats is list
+                    && request.resource.data.seats.size() <= 6
+                    && request.resource.data.hostId == resource.data.hostId
+                    && request.resource.data.createdAt == resource.data.createdAt;
+
+      // The game never deletes rooms.
+      allow delete: if false;
+    }
+
+    // Everything outside /games is closed.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
