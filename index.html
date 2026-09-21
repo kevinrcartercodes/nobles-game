@@ -1189,6 +1189,18 @@ button:focus-visible, [role=button]:focus-visible { outline: 3px solid var(--ter
     </div>
   </section>
 
+  <!-- ============ TAKE A SEAT (web build only) ============ -->
+  <section class="page screen" id="s-claim">
+    <header class="page-head">
+      <button class="btn icon" data-act="room-leave" aria-label="Back"><svg class="ico"><use href="#ic-back"/></svg></button>
+      <h2>Take a seat</h2>
+    </header>
+    <div class="page-body scroll">
+      <p class="hint">This game is under way. Take the seat of a player who has left, or one the computer is holding. Everything that house owns comes with it.</p>
+      <div class="seats" id="claim-seats"></div>
+    </div>
+  </section>
+
 
   <!-- ============ PLAY ============ -->
   <section class="play screen" id="s-play">
@@ -3980,9 +3992,9 @@ const Online = (() => {
     const data = doc.data();
     if (!isOurRoom(data)) throw new Error('That code is for the classic page — open Classic and join there');
     const mine = (data.seats || []).some(s => s.clientId === CLIENT_ID);
-    if (data.state && !mine) throw new Error('That game has already started');
-    if (!mine && (data.seats || []).length >= 6) throw new Error('That room is full');
-    if (!mine) {
+    const started = !!data.state;
+    if (!mine && !started && (data.seats || []).length >= 6) throw new Error('That room is full');
+    if (!mine && !started) {
       // arrayUnion is idempotent, so a double tap cannot seat you twice.
       await DB.collection(COLL).doc(code).update({
         seats: firebase.firestore.FieldValue.arrayUnion({ clientId: CLIENT_ID, name: name || 'Player', v: ROOM_VERSION }),
@@ -3990,7 +4002,7 @@ const Online = (() => {
     }
     room = code; host = data.hostId === CLIENT_ID; lastVersion = 0; remember(code);
     watch(code);
-    return { rejoin: !!data.state, state: data.state ? fromWire(data.state) : null };
+    return { started, seated: mine, state: data.state ? fromWire(data.state) : null };
   }
 
   function push(state) {
@@ -4223,7 +4235,7 @@ function startGame() {
 async function runStart() {
   const you = yourSeat();
   if (you) await showHouseCard(you);
-  afterCommand();
+  afterCommand(null, !online() || ON.isHost());   // the host opens the game, so it plays any computer seat that moves first
 }
 function resumeGame() {
   if (!saved) return;
@@ -5059,14 +5071,18 @@ async function run(cmd, after) {
   ui.busy = false; ui.tipHold = false;
   renderAll();
   save();
-  await afterCommand(r);
+  await afterCommand(r, true);
 }
-async function afterCommand() {
+// `local` means this browser just made the move. The computer's seats are played
+// by whoever handed the turn to them, so there is never a pause and never two
+// browsers playing the same turn. If that browser disappears mid-turn, the
+// watchdog below hands the job on.
+async function afterCommand(r, local) {
   if (!game || ui.screen !== 'play') return;
   if (game.phase === 'over') { await showVictory(); save(); return; }
   // Online, the computer seats are played by the host's browser; everyone
   // else watches the board arrive. Two clients running the AI would fight.
-  if (me().ai) { if (DBG) console.log('[nobles] afterCommand: AI seat', game.turn, 'online', online(), 'host', ON && ON.isHost()); if (!online() || ON.isHost()) await driveAI(); else showWaiting(); return; }
+  if (me().ai) { if (DBG) console.log('[nobles] afterCommand: AI seat', game.turn, 'online', online(), 'local', !!local); if (!online() || local) await driveAI(); else showWaiting(); return; }
   if (online() && !ON.isMine(me())) { showWaiting(); return; }
   const stamp = `${game.round}:${game.turn}:${game.phase}`;
   if (ui.turnStamp !== stamp) { ui.turnStamp = stamp; await humanTurnBegins(); }
@@ -5090,8 +5106,9 @@ async function humanTurnBegins() {
 async function driveAI() {
   ui.busy = true; ui.aiTurn = true; ui.skip = false; clearSel(); closeSheet(); renderAll();
   let guard = 0;
+  aiAbort = false;
   while (game && ui.screen === 'play' && game.phase !== 'over' && me().ai && guard++ < 60) {
-    if (online() && !ON.isHost()) break;
+    if (online() && aiAbort) break;
     const p = me();
     renderHud();
     if (game.phase === 'act') { showRibbon(p, `${dn(p)}'s turn`); await sleep(450); }
@@ -5307,7 +5324,7 @@ async function showVictory() {
   if (!RM()) for (let i = 0; i < 40; i++) { const a = Math.random() * Math.PI * 2, d = 120 + Math.random() * 260; burst.innerHTML += `<i style="--dx:${(Math.cos(a) * d).toFixed(0)}px;--dy:${(Math.sin(a) * d).toFixed(0)}px;animation-delay:${(Math.random() * 300).toFixed(0)}ms;color:${i % 3 ? 'var(--gold-light)' : col(w.id)}">${ico(i % 2 ? 'p-spark' : 'p-star', '')}</i>`; }
   const youP = yourSeat();
   const youWon = !!youP && w.id === youP.id;
-  const banner = ui.humans > 1
+  const banner = (ui.humans > 1 || (online() && !youP))
     ? `<div class="vbanner win">${esc(dn(w))} wins</div>`
     : `<div class="vbanner ${youWon ? 'win' : 'lose'}">${youWon ? 'You win' : 'You lose'}</div>`;
   $('victory').innerHTML = banner + `<svg class="corner tl" aria-hidden="true"><use href="#map-border"/></svg><svg class="corner br" aria-hidden="true"><use href="#map-border"/></svg><div class="seal">${ico('seal', 's')}${ico(crestOf(w.id), 'c')}</div><div><h1>${esc(dn(w))} wins</h1><p>by <b>${esc(v.cond)}</b> — ${esc(roleText(noEmoji(String(v.val))))}, round ${game.round}.</p></div><div class="actions"><button class="btn" data-act="victory-map">See the map</button><button class="btn" data-act="victory-title">Title</button><button class="primary" data-act="victory-new">New game</button></div>`;
@@ -5467,6 +5484,14 @@ document.addEventListener('click', async ev => {
     case 'room-join': await roomJoin($('online-code').value); break;
     case 'room-rejoin': await roomJoin(ON && ON.lastRoom()); break;
     case 'room-leave': roomLeave(); break;
+    case 'claim': {
+      const p = game && game.players[+a1]; if (!p || !ON) break;
+      p.clientId = ON.clientId; p.ai = false;
+      pushOnline();
+      showScreen('play'); renderAll();
+      toast(`You are the ${dn(p)}`);
+      await afterCommand();
+      break; }
     case 'room-copy': { const c = ON && ON.code(); if (c) { try { await navigator.clipboard.writeText(c); toast('Code copied'); } catch (e) { toast(c); } } break; }
     case 'room-start': {
       if (!ON || !ON.isHost()) break;
@@ -5575,7 +5600,9 @@ function renderHouses() {
 // All of this is dead weight in the iOS build, where ON is null: the buttons
 // that reach it only exist in the web build's HTML.
 function seatName(i) { const s = ON ? ON.seats()[i] : null; return s ? s.name : 'Human'; }
-function pushOnline() { if (DBG) console.log('[nobles] push?', online()); if (online() && game) { const st = E.serialize(game); game.version = st.version; ON.push(st); } }
+let lastStateAt = 0;       // when this browser last saw the board move, local or remote
+let aiAbort = false;       // a remote board landed while we were playing the computer's turns
+function pushOnline() { lastStateAt = Date.now(); if (DBG) console.log('[nobles] push?', online()); if (online() && game) { const st = E.serialize(game); game.version = st.version; ON.push(st); } }
 function myName() { return (lsGet('nobles-name') || '').slice(0, 14); }
 function showWaiting() {
   ui.remoteTurn = true; ui.aiTurn = false; ui.busy = false;
@@ -5590,7 +5617,12 @@ async function applyRemote(state) {
   let g;
   try { g = E.hydrate(state); } catch (e) { console.error('[online] bad state', e); return; }
   const prevRound = game ? game.round : 0;
-  const fresh = !game || ui.screen !== 'play';
+  // Someone picking a seat sits on the claim screen while the board keeps
+  // arriving behind them; only a genuinely new game takes over the screen.
+  const choosing = ui.screen === 'claim';
+  const fresh = !game || (!choosing && ui.screen !== 'play');
+  lastStateAt = Date.now();
+  if (ui.aiTurn) aiAbort = true;   // somebody else is driving the computer now; two drivers would fork the game
   game = g;
   ui.skip = false; ui.busy = false; ui.remoteTurn = false;
   clearSel(); closeSheet();
@@ -5602,6 +5634,7 @@ async function applyRemote(state) {
   }
   renderAll();
   if (fresh && yourSeat()) await showHouseCard(yourSeat());
+  else if (choosing) renderClaim();
   // The event modal fires inside the turn that ends a round, which happens in
   // one browser only. Everyone else sees the round tick over in the snapshot.
   else if (game.round > prevRound && game.currentEvent && game.eventAge === 0 && game.phase === 'act') showEvent(null);
@@ -5641,7 +5674,11 @@ async function roomJoin(code) {
   lsSet('nobles-name', name);
   let r;
   try { r = await ON.join(code, name); } catch (e) { toast(e.message || 'Could not join'); return; }
-  if (r.rejoin && r.state) { await applyRemote(r.state); return; }   // game already running: straight to the board
+  if (r.started && r.state) {
+    await applyRemote(r.state);                 // watch the live board either way
+    if (!r.seated) { renderClaim(); showScreen('claim'); }
+    return;
+  }
   renderLobby(); showScreen('lobby');
 }
 function roomLeave() {
@@ -5649,11 +5686,48 @@ function roomLeave() {
   game = null; ui.remoteTurn = false;
   showScreen('online'); renderOnline();
 }
+// Seats a newcomer may take: anyone who left, or a seat the computer is holding.
+function renderClaim() {
+  const ps = game ? game.players.filter(p => !p.eliminated) : [];
+  $('claim-seats').innerHTML = ps.map(p => {
+    const mine = ON.isMine(p);
+    const held = p.ai ? 'played by the computer' : mine ? 'yours' : 'held by a player';
+    const pr = E.progress(game, p.id);
+    return `<div class="seat">
+      <div class="crest" style="color:${col(p.id)}">${ico(crestOf(p.id), '')}</div>
+      <div class="nm">${esc(dn(p))}<span class="hint"> · ${held} · ${pr.pop}/${pr.popMax} population</span></div>
+      <div class="toggle"><button data-act="claim:${p.id}"${mine ? ' disabled' : ''}>${mine ? 'Yours' : 'Take'}</button></div>
+    </div>`;
+  }).join('') || '<p class="hint">No seats to take.</p>';
+}
+// The computer's seats are played by the host. If the host goes quiet — closed the
+// tab, lost the connection — the waiting players take over in turn order, one at a
+// time: seat order decides who, and the wait grows with each place, so two browsers
+// never drive the same turn. (They could not agree anyway: an online game rolls its
+// dice with Math.random, so two runs would deal different boards.)
+function aiDriverRank() {
+  if (!game || !ON) return -1;
+  const n = game.players.length, order = [];
+  for (let i = 1; i <= n; i++) { const p = game.players[(game.turn + i) % n]; if (!p.ai && !p.eliminated) order.push(p); }
+  return order.findIndex(p => ON.isMine(p));
+}
+function aiWatchdog() {
+  if (!online() || !game || ui.screen !== 'play' || ui.busy) return;
+  if (game.phase === 'over' || !me().ai) return;
+  const rank = aiDriverRank();
+  if (rank < 0) return;                       // not our job, or we hold no seat
+  const wait = 10000 + rank * 8000;
+  if (Date.now() - lastStateAt < wait) return;
+  if (DBG) console.log('[nobles] taking over the computer seats after', wait, 'ms of silence');
+  toast('Playing the computer\u2019s turn');
+  driveAI();
+}
 function wireOnline() {
   if (!ON) return;
   ON.on('state', st => { applyRemote(st); });
   ON.on('seats', (seats, started) => { if (ui.screen === 'lobby') { renderLobby(); } });
   ON.on('error', msg => toast(msg));
+  setInterval(aiWatchdog, 4000);
 }
 
 // ---------------------------------------------------------------- boot
