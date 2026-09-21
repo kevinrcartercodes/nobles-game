@@ -570,7 +570,24 @@ button:focus-visible, [role=button]:focus-visible { outline: 3px solid var(--ter
    The app build leaves the marker empty, so this rule matches nothing there. */
 .title a.btn.online { width: 100%; margin-top: 10px; text-decoration: none; color: inherit; }
 
+/* ---------- online play (web build only) ---------- */
+.online-body { display: flex; flex-direction: column; gap: 12px; max-width: 520px; margin: 0 auto; width: 100%; }
+.online-body .col { display: flex; flex-direction: column; gap: 6px; }
+.online-body a.btn { text-decoration: none; color: inherit; }
+.field { height: var(--btn-h); border-radius: var(--r-md); border: 1.5px solid var(--paper-edge); background: var(--paper); color: var(--ink);
+  font-family: var(--body); font-size: var(--fs-body); font-weight: 600; padding: 0 14px; width: 100%; box-sizing: border-box; }
+.field:focus { outline: 2px solid var(--terracotta-2); outline-offset: 1px; }
+.field.code { font-family: var(--display); font-size: calc(22px * var(--ts)); letter-spacing: .18em; text-transform: uppercase; text-align: center; }
+.joinrow { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
+.roomcode { display: block; width: 100%; font-family: var(--display); font-weight: 700; font-size: calc(40px * var(--ts)); letter-spacing: .22em;
+  text-align: center; padding: 14px 0; border-radius: var(--r-md); border: 1.5px solid var(--paper-edge); background: var(--paper); color: var(--ink); box-shadow: var(--shadow-chip); }
+.roomcode:active { transform: scale(.99); }
+#lobby-seats { gap: 8px; }
+#s-lobby .page-body { max-width: 520px; margin: 0 auto; width: 100%; }
+
 </style>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 </head>
 <body>
 <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" style="position:absolute;width:0;height:0;overflow:hidden" aria-hidden="true" id="nobles-sprites">
@@ -1080,7 +1097,7 @@ button:focus-visible, [role=button]:focus-visible { outline: 3px solid var(--ter
         <button class="btn" data-act="howto" aria-label="How to play"><svg class="ico"><use href="#ic-rules"/></svg>How to play</button>
         <button class="btn" data-act="houses" aria-label="The six houses"><svg class="ico"><use href="#ic-houses"/></svg>Houses</button>
       </div>
-      <a class="btn online" href="classic.html" aria-label="Play online with friends"><svg class="ico"><use href="#ic-houses"/></svg>Play online</a>
+      <button class="btn online" data-act="online" aria-label="Play online with friends"><svg class="ico"><use href="#ic-houses"/></svg>Play online</button>
     </div>
   </section>
 
@@ -1129,6 +1146,49 @@ button:focus-visible, [role=button]:focus-visible { outline: 3px solid var(--ter
     </header>
     <div class="page-body scroll" id="houses-body"></div>
   </section>
+
+    <!-- ============ ONLINE (web build only) ============ -->
+  <section class="page screen" id="s-online">
+    <header class="page-head">
+      <button class="btn icon" data-act="title" aria-label="Back"><svg class="ico"><use href="#ic-back"/></svg></button>
+      <h2>Play online</h2>
+    </header>
+    <div class="page-body scroll online-body">
+      <p class="hint">One player makes a room and reads out the code. Everyone else joins with it. Empty seats are played by the computer.</p>
+      <div class="col">
+        <div class="label">Your name</div>
+        <input class="field" id="online-name" maxlength="14" autocomplete="nickname" placeholder="Name" aria-label="Your name">
+      </div>
+      <button class="primary" data-act="room-create" aria-label="Make a room">Make a room</button>
+      <div class="col">
+        <div class="label">Join a room</div>
+        <div class="joinrow">
+          <input class="field code" id="online-code" maxlength="8" autocapitalize="characters" spellcheck="false" placeholder="CODE" aria-label="Room code">
+          <button class="btn" data-act="room-join" aria-label="Join that room">Join</button>
+        </div>
+      </div>
+      <button class="btn" id="btn-rejoin" data-act="room-rejoin" hidden></button>
+      <p class="hint" id="online-note"></p>
+      <a class="btn" href="classic.html">The classic version (its own rooms)</a>
+    </div>
+  </section>
+
+  <!-- ============ LOBBY (web build only) ============ -->
+  <section class="page screen" id="s-lobby">
+    <header class="page-head">
+      <button class="btn icon" data-act="room-leave" aria-label="Leave the room"><svg class="ico"><use href="#ic-back"/></svg></button>
+      <h2>Room</h2>
+      <span class="spacer"></span>
+      <button class="primary" id="lobby-start" data-act="room-start" aria-label="Start the game"><svg class="ico"><use href="#ic-endturn"/></svg>Start</button>
+    </header>
+    <div class="page-body scroll">
+      <button class="roomcode" id="lobby-code" data-act="room-copy" aria-label="Room code, tap to copy"></button>
+      <p class="hint" id="lobby-hint">Read the code out to your friends.</p>
+      <div class="label">In the room</div>
+      <div class="seats" id="lobby-seats"></div>
+    </div>
+  </section>
+
 
   <!-- ============ PLAY ============ -->
   <section class="play screen" id="s-play">
@@ -3802,6 +3862,174 @@ if (root) root.NoblesEngine = api;
 
 </script>
 <script>
+// ============================================================================
+// ONLINE PLAY — web build only
+// ============================================================================
+// tools/build.js injects this file (and the Firebase SDK) only for --web. The
+// iOS build never loads it, so every call site in app.js is written to be a
+// no-op when `Online` is undefined: the app stays self-contained and offline,
+// which is what App Review checks for.
+//
+// Rooms live in the same Firestore collection as the classic page (the
+// published rules allow /games and nothing else, and we cannot edit them from
+// here), so a room made here is marked in its first seat with `v: 2`. A code
+// from the classic page is refused with a message instead of half-working.
+const Online = (() => {
+  const FIREBASE_CONFIG = {
+    apiKey: "AIzaSyA5Rjsa1Y54JK96Itz7-6Tl8rVbNXNOQys",
+    authDomain: "noblesthegame.firebaseapp.com",
+    projectId: "noblesthegame",
+    storageBucket: "noblesthegame.firebasestorage.app",
+    messagingSenderId: "78329656934",
+    appId: "1:78329656934:web:a423d2db3bde1c3db01fa7",
+  };
+  const COLL = 'games';
+  const ROOM_VERSION = 2;
+  const LAST_ROOM = 'nobles-last-room';
+
+  let DB = null;
+  try {
+    if (typeof firebase !== 'undefined' && firebase.initializeApp) {
+      firebase.initializeApp(FIREBASE_CONFIG);
+      DB = firebase.firestore();
+      // Firestore throws synchronously on undefined values while validating a
+      // write, before any promise exists, so .catch() would never see it. The
+      // game state has plenty of optional fields; drop them instead.
+      DB.settings({ ignoreUndefinedProperties: true });
+    }
+  } catch (e) { console.warn('[online] Firebase unavailable — offline only', e); }
+
+  // Stable per-browser identity. No accounts: whoever holds the code is in.
+  const CLIENT_ID = (() => {
+    let id = null;
+    try { id = localStorage.getItem('nobles-client-id'); } catch (e) {}
+    if (!id) {
+      id = 'c_' + Math.random().toString(36).slice(2, 10);
+      try { localStorage.setItem('nobles-client-id', id); } catch (e) {}
+    }
+    return id;
+  })();
+
+  let room = null;        // room code, null when offline
+  let host = false;
+  let seats = [];         // [{clientId, name}] in join order = seat order
+  let unsub = null;
+  let lastVersion = 0;    // highest state version we have applied or written
+  const handlers = { state: null, seats: null, error: null };
+
+  const remember = code => { try { code ? localStorage.setItem(LAST_ROOM, code) : localStorage.removeItem(LAST_ROOM); } catch (e) {} };
+  const lastRoom = () => { try { return localStorage.getItem(LAST_ROOM); } catch (e) { return null; } };
+
+  function makeCode() {
+    // 6 characters, no glyphs that get misread over a phone (0/O, 1/I/L).
+    const alphabet = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+    let s = '';
+    for (let i = 0; i < 6; i++) s += alphabet[Math.floor(Math.random() * alphabet.length)];
+    return s;
+  }
+
+  const isOurRoom = data => !!(data && Array.isArray(data.seats) && data.seats[0] && data.seats[0].v === ROOM_VERSION);
+
+  // Firestore refuses an array inside an array, and the board ships its tract
+  // centres as [q, r] pairs. Send them as maps and rebuild them on the way in.
+  // (This is also why a room made here cannot be read by the classic page.)
+  const toWire = st => ({ ...st, tractCenters: (st.tractCenters || []).map(c => Array.isArray(c) ? { q: c[0], r: c[1] } : c) });
+  const fromWire = st => (!st || !Array.isArray(st.tractCenters)) ? st
+    : { ...st, tractCenters: st.tractCenters.map(c => (c && typeof c === 'object' && !Array.isArray(c)) ? [c.q, c.r] : c) };
+
+  function watch(code) {
+    if (unsub) unsub();
+    unsub = DB.collection(COLL).doc(code).onSnapshot(doc => {
+      const data = doc.data();
+      if (!data) return;
+      seats = data.seats || [];
+      if (handlers.seats) handlers.seats(seats, !!data.state);
+      // Our own writes echo back before the server confirms them; we already
+      // have that state, and re-hydrating would throw away the selection.
+      if (doc.metadata.hasPendingWrites) return;
+      const st = data.state;
+      if (!st || (st.version || 0) <= lastVersion) return;
+      lastVersion = st.version || 0;
+      if (handlers.state) handlers.state(fromWire(st));
+    }, e => {
+      console.error('[online] listener died', e);
+      if (handlers.error) handlers.error('Lost the connection to the room');
+    });
+  }
+
+  async function create(name) {
+    if (!DB) throw new Error('Online play is not available');
+    const code = makeCode();
+    await DB.collection(COLL).doc(code).set({
+      hostId: CLIENT_ID,
+      seats: [{ clientId: CLIENT_ID, name: name || 'Host', v: ROOM_VERSION }],
+      state: null,
+      createdAt: Date.now(),
+    });
+    room = code; host = true; lastVersion = 0; remember(code);
+    watch(code);
+    return code;
+  }
+
+  async function join(code, name) {
+    if (!DB) throw new Error('Online play is not available');
+    code = String(code || '').trim().toUpperCase();
+    if (!/^[A-Z0-9]{4,8}$/.test(code)) throw new Error('That code does not look right');
+    const doc = await DB.collection(COLL).doc(code).get();
+    if (!doc.exists) throw new Error('No room with that code');
+    const data = doc.data();
+    if (!isOurRoom(data)) throw new Error('That code is for the classic page — open Classic and join there');
+    const mine = (data.seats || []).some(s => s.clientId === CLIENT_ID);
+    if (data.state && !mine) throw new Error('That game has already started');
+    if (!mine && (data.seats || []).length >= 6) throw new Error('That room is full');
+    if (!mine) {
+      // arrayUnion is idempotent, so a double tap cannot seat you twice.
+      await DB.collection(COLL).doc(code).update({
+        seats: firebase.firestore.FieldValue.arrayUnion({ clientId: CLIENT_ID, name: name || 'Player', v: ROOM_VERSION }),
+      });
+    }
+    room = code; host = data.hostId === CLIENT_ID; lastVersion = 0; remember(code);
+    watch(code);
+    return { rejoin: !!data.state, state: data.state ? fromWire(data.state) : null };
+  }
+
+  function push(state) {
+    if (!room || !DB || !state) return;
+    // A failed sync must never take the local game down with it: the acting
+    // player keeps playing, and the next push carries the same board anyway.
+    try {
+      lastVersion = state.version || 0;
+      DB.collection(COLL).doc(room).set({ state: toWire(state) }, { merge: true })
+        .catch(e => { console.error('[online] push failed', e); if (handlers.error) handlers.error('Could not reach the room'); });
+    } catch (e) { console.error('[online] push failed', e); }
+  }
+
+  function leave() {
+    if (unsub) { unsub(); unsub = null; }
+    room = null; host = false; seats = []; lastVersion = 0;
+    remember(null);
+  }
+
+  return {
+    available: () => !!DB,
+    active: () => !!room,
+    code: () => room,
+    isHost: () => host,
+    seats: () => seats.slice(),
+    clientId: CLIENT_ID,
+    lastRoom,
+    forget: () => remember(null),
+    create, join, push, leave,
+    on: (what, fn) => { handlers[what] = fn; },
+    // A seat is yours when it carries your id. A human seat nobody claimed
+    // (the host set more humans than joined) falls to the host, so the game
+    // cannot stall waiting for a player who is not there.
+    isMine: p => !!p && !p.ai && (p.clientId === CLIENT_ID || (p.clientId == null && host)),
+  };
+})();
+
+</script>
+<script>
 /* Nobles Mobile v2 — the board is the screen. Drives window.NoblesEngine. */
 (() => {
 'use strict';
@@ -3840,7 +4068,7 @@ let vis = null;                 // display model the board renders from (follows
 const ui = {
   screen: 'title', prev: 'title',
   sel: null, lit: new Map(), hot: new Map(), mode: null, rangedPending: null,
-  busy: false, skip: false, aiTurn: false,
+  busy: false, skip: false, aiTurn: false, remoteTurn: false,
   lastHuman: null, humans: 1, tipsOn: false, spotKey: null,
   eventResolve: null, handoffResolve: null, sheet: null, staticDirty: true, turnStamp: null,
   actReason: null,
@@ -3864,7 +4092,19 @@ const noEmoji = s => String(s).replace(/[\u{1F000}-\u{1FFFF}\u{2600}-\u{27BF}\u{
 const use = (id, x, y, s, extra = '') => `<use href="#${id}" x="${(x - s / 2).toFixed(1)}" y="${(y - s / 2).toFixed(1)}" width="${s.toFixed(1)}" height="${s.toFixed(1)}" ${extra}/>`;
 const ico = (id, cls = 'ico') => `<svg class="${cls}" aria-hidden="true"><use href="#${id}"/></svg>`;
 const me = () => game.players[game.turn];
-const isHumanTurn = () => game && !me().ai && game.phase !== 'over';
+// Online play only exists in the web build (src/ui/online.js). Everything here
+// must still be right when Online is undefined, which is how the iOS app runs.
+const ON = typeof Online !== 'undefined' ? Online : null;
+const DBG = /[?&]dbg=1/.test(location.search);
+const online = () => !!(ON && ON.active());
+// The seat this browser plays. Offline that is the first human seat (one
+// person holds them all); online it is the seat carrying our client id.
+const yourSeat = () => {
+  if (!game || !game.players) return null;
+  if (online()) return game.players.find(p => ON.isMine(p)) || null;
+  return game.players.find(p => !p.ai) || null;
+};
+const isHumanTurn = () => game && !me().ai && game.phase !== 'over' && (!online() || ON.isMine(me()));
 
 // ---------------------------------------------------------------- settings
 function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
@@ -3889,6 +4129,9 @@ function validSave(d) {
   return d && d.state && d.meta && Array.isArray(d.state.players) && d.state.players.length >= 2 && Array.isArray(d.state.hexes) && d.state.hexes.length > 10 && typeof d.meta.round === 'number';
 }
 function save() {
+  // Online games are saved in the room, and rejoining pulls the live board.
+  // A local copy would only offer a stale "Continue" from the title screen.
+  if (online()) { saved = null; lsSet(SAVE_KEY, null); renderContinue(); return; }
   if (!game || game.phase === 'over') { saved = null; lsSet(SAVE_KEY, null); if (N && N.save) N.save('autosave', null); renderContinue(); return; }
   const p = me();
   saved = { v: 2, state: E.serialize(game), meta: { savedAt: Date.now(), round: game.round, turn: dn(p), humans: ui.humans, lastHuman: ui.lastHuman, tipsOn: ui.tipsOn } };
@@ -3929,7 +4172,7 @@ function showScreen(name) {
 function goBack() { showScreen(ui.prev === 'play' && game ? 'play' : 'title'); }
 
 // ---------------------------------------------------------------- new game screen
-const setup = { count: 4, diff: 'medium', seats: [false, true, true, true, true, true] };  // seats[i] = ai?
+const setup = { count: 4, diff: 'medium', seats: [false, true, true, true, true, true], locked: 0 };  // seats[i] = ai?; locked = seats already claimed in a room
 function renderSetup() {
   $('seg-count').innerHTML = [2, 3, 4, 5, 6].map(n => `<button role="radio" aria-checked="${n === setup.count}" aria-label="${n} players" data-act="count:${n}">${n}</button>`).join('');
   const di = Math.max(0, DIFFS.findIndex(d => d[0] === setup.diff));
@@ -3941,8 +4184,8 @@ function renderSetup() {
     <div class="seat">
       <div class="crest" style="color:${col(i)}">${ico(s.crest, '')}</div>
       <div class="toggle" role="radiogroup" aria-label="Seat ${i + 1}">
-        <button role="radio" aria-checked="${!setup.seats[i]}" data-act="seat:${i}:human">Human</button>
-        <button role="radio" aria-checked="${!!setup.seats[i]}" data-act="seat:${i}:ai">Computer</button>
+        <button role="radio" aria-checked="${!setup.seats[i]}" data-act="seat:${i}:human"${i < setup.locked ? ' disabled' : ''}>${i < setup.locked ? esc(seatName(i)) : 'Human'}</button>
+        <button role="radio" aria-checked="${!!setup.seats[i]}" data-act="seat:${i}:ai"${i < setup.locked ? ' disabled' : ''}>Computer</button>
       </div>
     </div>`).join('');
   requestAnimationFrame(() => { const el = $('seats'); el.classList.toggle('fits', el.scrollHeight <= el.clientHeight + 2); });
@@ -3960,17 +4203,25 @@ function startGame() {
   const players = SEATS.slice(0, setup.count).map((s, i) => ({ ai: !!setup.seats[i] }));
   const humans = players.filter(p => !p.ai).length;
   game = E.createGame({ players, difficulty: setup.diff });
-  ui.humans = humans; ui.lastHuman = null; ui.tipsOn = tipsDecision(setup.diff, humans); ui.skip = false; ui.turnStamp = null;
+  if (online()) {
+    // Seats go to the players in join order; any seat left over is the
+    // computer's. Online.isMine() reads these ids to gate every tap.
+    const claimed = ON.seats();
+    let i = 0;
+    for (const p of game.players) if (!p.ai && i < claimed.length) p.clientId = claimed[i++].clientId;
+  }
+  ui.humans = online() ? 1 : humans; ui.lastHuman = null; ui.tipsOn = tipsDecision(setup.diff, humans); ui.skip = false; ui.turnStamp = null;
   clearSel(); closeSheet(); spotHide();
   vis = snapshot(); bounds = null; ui.staticDirty = true;
   showScreen('play');
   computeBounds(); fitHome(true);
   save();
+  pushOnline();
   runStart();
 }
 // Deal the human their house, then hand over to the normal turn flow.
 async function runStart() {
-  const you = game.players.find(p => !p.ai);
+  const you = yourSeat();
   if (you) await showHouseCard(you);
   afterCommand();
 }
@@ -4052,7 +4303,7 @@ function homeHex(pid) {
   const p = game.players[pid]; const tc = game.tractCenters && game.tractCenters[p.homeTract];
   return tc ? { q: tc[0], r: tc[1] } : { q: 0, r: 0 };
 }
-function humanHome() { const h = game.players.find(p => !p.ai) ? (isHumanTurn() ? me() : game.players.find(p => !p.ai)) : me(); return homeHex(h.id); }
+function humanHome() { const h = yourSeat() ? (isHumanTurn() ? me() : yourSeat()) : me(); return homeHex(h.id); }
 function centreOnPoint(p, s, instant, dy = 0) {
   const { w, h } = frameSize();
   const ns = s || view.s;
@@ -4131,7 +4382,7 @@ function glideTo(target, instant) {
 // Home view: your castle, nudged 1.4 hexes toward the board centre so the neighbouring provinces are on screen, not the void.
 function fitHome(instant) {
   if (!game) return; baseScale();
-  const p = pos(homeHex(isHumanTurn() ? me().id : (game.players.find(x => !x.ai) || me()).id));
+  const p = pos(homeHex(isHumanTurn() ? me().id : (yourSeat() || me()).id));
   const d = Math.hypot(p.x, p.y) || 1;
   // during placement the whole province must sit above the caption chip: lift the camera by half the bottom band
   const placing = game.phase === 'setup-castle';
@@ -4239,7 +4490,7 @@ function renderBoard() {
   }
   $('L-live').innerHTML = `<g>${hold}</g><g>${units}</g>`;
   $('L-rings').innerHTML = rings;
-  $('board-wrap').classList.toggle('dim', !!ui.aiTurn);
+  $('board-wrap').classList.toggle('dim', !!(ui.aiTurn || ui.remoteTurn));
 }
 
 // ---------------------------------------------------------------- HUD
@@ -4281,7 +4532,7 @@ function renderHud() {
   const p = me();
   const human = isHumanTurn();
   const gold = vis ? vis.gold[p.id] : p.gold;
-  const human0 = game.players.find(x => !x.ai) || p;
+  const human0 = yourSeat() || p;
   const shown = human ? p : human0;
   $('hud-gold-n').textContent = vis ? vis.gold[shown.id] : shown.gold;
   const bill = game.phase === 'act' ? E.supplyBill(game, shown.id) : 0;
@@ -4359,7 +4610,7 @@ function leaderOf() {
 }
 function renderRace() {
   const el = $('hud-race'); if (!game || game.phase !== 'act') { el.hidden = true; return; }
-  const human = game.players.find(q => !q.ai) || me();
+  const human = yourSeat() || me();
   const you = isHumanTurn() ? me() : human;
   const lead = leaderOf();
   const threat = game.players.map(q => ({ q, pr: E.progress(game, q.id) })).filter(x => x.pr.keep <= 2).sort((a, b) => a.pr.keep - b.pr.keep)[0];
@@ -4603,7 +4854,7 @@ function renderSheet() {
   if (kind === 'board') {
     body.innerHTML = `<div class="sheet-head"><h2>The realm · round ${game.round}</h2><button class="btn" data-act="sheet-close">Close</button></div><div class="lb">
       <span></span><span></span><span class="h">Gold</span><span class="h">Population</span><span class="h">Income</span><span class="h">Walls</span>
-      ${(() => { const lead = leaderOf(); const you = game.players.find(q => !q.ai); return game.players.slice().sort((a, b) => (a.id === lead.id ? -1 : b.id === lead.id ? 1 : 0)).map(q => { const pr = E.progress(game, q.id); const c = col(q.id); const wc = pr.keep <= 2 ? 'var(--rose)' : c; const tag = q.id === lead.id ? ' · leader' : (you && q.id === you.id ? ' · you' : ''); return `
+      ${(() => { const lead = leaderOf(); const you = yourSeat(); return game.players.slice().sort((a, b) => (a.id === lead.id ? -1 : b.id === lead.id ? 1 : 0)).map(q => { const pr = E.progress(game, q.id); const c = col(q.id); const wc = pr.keep <= 2 ? 'var(--rose)' : c; const tag = q.id === lead.id ? ' · leader' : (you && q.id === you.id ? ' · you' : ''); return `
         <svg style="color:${c}" aria-hidden="true"><use href="#${crestOf(q.id)}"/></svg><span class="n${q.id === lead.id ? ' row-active' : ''}">${esc(dn(q))}${tag}</span><span class="g">${vis ? vis.gold[q.id] : q.gold}</span>
         <span class="m" aria-label="population ${pr.pop} of ${pr.popMax}"><i style="--v:${(100 * pr.pop / pr.popMax).toFixed(0)}%;--c:${c}"></i><b>${pr.pop}/${pr.popMax}</b></span>
         <span class="m" aria-label="income ${pr.income} of ${pr.incomeMax}"><i style="--v:${(100 * pr.income / pr.incomeMax).toFixed(0)}%;--c:${c}"></i><b>${pr.income}/${pr.incomeMax}</b></span>
@@ -4612,7 +4863,7 @@ function renderSheet() {
     return;
   }
   if (kind === 'income') {
-    const q = isHumanTurn() ? p : (game.players.find(x => !x.ai) || p);
+    const q = isHumanTurn() ? p : (yourSeat() || p);
     const fiefs = E.countFiefs(game, q.id), pop = E.totalPop(game, q), bill = E.supplyBill(game, q.id), units = E.countUnits(game, q.id);
     body.innerHTML = `<h2><svg style="color:${col(q.id)}" aria-hidden="true"><use href="#${crestOf(q.id)}"/></svg>${esc(dn(q))}</h2>
       ${kv([['Gold', vis ? vis.gold[q.id] : q.gold], ['Coming in next turn', `+${nextIncome(q)}`], ['Fiefs', fiefs], ['Population', pop], ['Supply due', bill ? `−${bill}` : '0', bill > q.gold ? 'danger' : ''], ['Units', units]])}
@@ -4801,6 +5052,7 @@ async function run(cmd, after) {
     renderAll();
     return;
   }
+  pushOnline();          // the other players get the board now, not when our animation ends
   await playEffects(r.effects, false);
   if (after) after(r);
   vis = snapshot();
@@ -4812,7 +5064,10 @@ async function run(cmd, after) {
 async function afterCommand() {
   if (!game || ui.screen !== 'play') return;
   if (game.phase === 'over') { await showVictory(); save(); return; }
-  if (me().ai) { await driveAI(); return; }
+  // Online, the computer seats are played by the host's browser; everyone
+  // else watches the board arrive. Two clients running the AI would fight.
+  if (me().ai) { if (DBG) console.log('[nobles] afterCommand: AI seat', game.turn, 'online', online(), 'host', ON && ON.isHost()); if (!online() || ON.isHost()) await driveAI(); else showWaiting(); return; }
+  if (online() && !ON.isMine(me())) { showWaiting(); return; }
   const stamp = `${game.round}:${game.turn}:${game.phase}`;
   if (ui.turnStamp !== stamp) { ui.turnStamp = stamp; await humanTurnBegins(); }
 }
@@ -4820,9 +5075,9 @@ async function humanTurnBegins() {
   if (!game || ui.screen !== 'play') return;
   const p = me();
   ui.turnStamp = `${game.round}:${game.turn}:${game.phase}`;
-  ui.skip = false; ui.aiTurn = false; ui.tipHold = false; clearTimeout(capTimer); $('toast').hidden = true;
+  ui.skip = false; ui.aiTurn = false; ui.remoteTurn = false; ui.tipHold = false; clearTimeout(capTimer); $('toast').hidden = true;
   clearSel(); closeSheet();
-  if (ui.humans > 1 && ui.lastHuman !== p.id) { renderBoard(); await handoff(p); }
+  if (!online() && ui.humans > 1 && ui.lastHuman !== p.id) { renderBoard(); await handoff(p); }
   ui.lastHuman = p.id;
   if (game.phase === 'setup-castle') lightCastleSites(); else clearSel();
   if (!bounds) computeBounds();
@@ -4836,17 +5091,20 @@ async function driveAI() {
   ui.busy = true; ui.aiTurn = true; ui.skip = false; clearSel(); closeSheet(); renderAll();
   let guard = 0;
   while (game && ui.screen === 'play' && game.phase !== 'over' && me().ai && guard++ < 60) {
+    if (online() && !ON.isHost()) break;
     const p = me();
     renderHud();
     if (game.phase === 'act') { showRibbon(p, `${dn(p)}'s turn`); await sleep(450); }
     let r;
     try { r = E.runAITurn(game); } catch (err) { console.error(err); break; }
     if (!r.ok) break;
+    pushOnline();
     await playEffects(r.effects, true);
     if (game.phase === 'over') break;
     if (!r.turnEnded && game.phase === 'act') {
       const e = E.endTurn(game);
       if (!e.ok) break;
+      pushOnline();     // an event card waiting on the host must not hold up the table
       await playEffects(e.effects, true);
     }
     vis = snapshot(); renderBoard(); renderHud(); save();
@@ -4855,6 +5113,8 @@ async function driveAI() {
   if (!game || ui.screen !== 'play') return;
   vis = snapshot(); renderAll(); save();
   if (game.phase === 'over') { await showVictory(); save(); return; }
+  pushOnline();
+  if (online() && !ON.isMine(me())) { showWaiting(); return; }
   await humanTurnBegins();
 }
 function aiCaption(e) {
@@ -5045,7 +5305,7 @@ async function showVictory() {
   showRibbon(w, `${dn(w)} wins`);
   const burst = $('vburst'); burst.innerHTML = '';
   if (!RM()) for (let i = 0; i < 40; i++) { const a = Math.random() * Math.PI * 2, d = 120 + Math.random() * 260; burst.innerHTML += `<i style="--dx:${(Math.cos(a) * d).toFixed(0)}px;--dy:${(Math.sin(a) * d).toFixed(0)}px;animation-delay:${(Math.random() * 300).toFixed(0)}ms;color:${i % 3 ? 'var(--gold-light)' : col(w.id)}">${ico(i % 2 ? 'p-spark' : 'p-star', '')}</i>`; }
-  const youP = game.players.find(q => !q.ai);
+  const youP = yourSeat();
   const youWon = !!youP && w.id === youP.id;
   const banner = ui.humans > 1
     ? `<div class="vbanner win">${esc(dn(w))} wins</div>`
@@ -5201,7 +5461,21 @@ document.addEventListener('click', async ev => {
   if (btn.classList.contains('act') && btn.classList.contains('off')) { ui.actReason = actionReason(act) || 'Not available right now'; renderActionBar(); haptic('warning'); setTimeout(() => { if (ui.actReason) { ui.actReason = null; if (ui.screen === 'play') renderActionBar(); } }, 2200); return; }
   if (ui.spotKey && ui.spotTap && (btn.id === 'hud-end' || btn.id === 'hud-round' || btn.closest('.actionbar'))) spotHide();
   switch (verb) {
-    case 'new': renderSetup(); showScreen('new'); break;
+    case 'new': setup.locked = 0; if (online()) roomLeave(); renderSetup(); showScreen('new'); break;
+    case 'online': renderOnline(); showScreen('online'); break;
+    case 'room-create': await roomCreate(); break;
+    case 'room-join': await roomJoin($('online-code').value); break;
+    case 'room-rejoin': await roomJoin(ON && ON.lastRoom()); break;
+    case 'room-leave': roomLeave(); break;
+    case 'room-copy': { const c = ON && ON.code(); if (c) { try { await navigator.clipboard.writeText(c); toast('Code copied'); } catch (e) { toast(c); } } break; }
+    case 'room-start': {
+      if (!ON || !ON.isHost()) break;
+      const n = ON.seats().length;
+      setup.locked = n;
+      setup.count = Math.max(setup.count, Math.max(2, n));
+      for (let i = 0; i < 6; i++) setup.seats[i] = i >= n;
+      renderSetup(); showScreen('new');
+      break; }
     case 'continue': resumeGame(); break;
     case 'howto': renderHowto(); showScreen('howto'); break;
     case 'houses': renderHouses(); showScreen('houses'); break;
@@ -5210,7 +5484,7 @@ document.addEventListener('click', async ev => {
     case 'start': startGame(); break;
     case 'count': setup.count = +a1; renderSetup(); break;
     case 'diff': setup.diff = a1; renderSetup(); break;
-    case 'seat': setup.seats[+a1] = a2 === 'ai'; if (!setup.seats.slice(0, setup.count).some(x => !x) && a2 === 'ai') { toast('At least one seat must be human'); setup.seats[+a1] = false; } renderSetup(); break;
+    case 'seat': if (+a1 < setup.locked) break; setup.seats[+a1] = a2 === 'ai'; if (!setup.seats.slice(0, setup.count).some(x => !x) && a2 === 'ai') { toast('At least one seat must be human'); setup.seats[+a1] = false; } renderSetup(); break;
     case 'end-turn': if (!ui.busy && isHumanTurn()) { haptic('light'); const e = $('hud-end'); e.classList.remove('stamp'); void e.offsetWidth; e.classList.add('stamp'); await run(() => E.endTurn(game)); } break;
     case 'supply-force': closeSheet(); await run(() => E.endTurn(game, { force: true })); break;
     case 'deselect': clearSel(); renderAll(); break;
@@ -5241,7 +5515,7 @@ document.addEventListener('click', async ev => {
     case 'menu': if (!game) break; openSheet('menu'); break;
     case 'menu-howto': closeSheet(); renderHowto(); showScreen('howto'); break;
     case 'menu-houses': closeSheet(); renderHouses(); showScreen('houses'); break;
-    case 'menu-quit': { closeSheet(); save(); spotHide(); $('v-handoff').hidden = true; $('v-event').hidden = true; const hr = ui.handoffResolve, er = ui.eventResolve; ui.handoffResolve = null; ui.eventResolve = null; showScreen('title'); if (hr) hr(); if (er) er(); break; }
+    case 'menu-quit': { closeSheet(); save(); spotHide(); if (online()) { ON.leave(); game = null; } $('v-handoff').hidden = true; $('v-event').hidden = true; const hr = ui.handoffResolve, er = ui.eventResolve; ui.handoffResolve = null; ui.eventResolve = null; showScreen('title'); if (hr) hr(); if (er) er(); break; }
     case 'set': { if (a1 === 'text') settings.text = a2; else settings[a1] = a2 === '1'; applySettings(); renderSheet(); if (a1 === 'text') requestAnimationFrame(() => { renderHud(); }); break; }
     case 'tip-ok': closeTip(false); renderAll(); break;
     case 'tip-skip': closeTip(true); renderAll(); break;
@@ -5279,7 +5553,7 @@ function renderHouses() {
     <p class="hint" style="text-align:center;margin:0 0 6px">One of these six houses is dealt to each seat at random when a game begins.</p>
     ${(() => {
       const held = {}; if (game && game.players) for (const q of game.players) held[q.house.key] = q;
-      const you = game && game.players ? game.players.find(q => !q.ai) : null;
+      const you = game && game.players ? yourSeat() : null;
       const rows = RULES.HOUSES.slice().sort((a, b) => (held[b.key] ? 1 : 0) - (held[a.key] ? 1 : 0) || ((held[a.key] ? held[a.key].id : 0) - (held[b.key] ? held[b.key].id : 0)));
       let out = '', shownIdle = false;
       for (const h of rows) {
@@ -5294,6 +5568,92 @@ function renderHouses() {
       return out;
     })()}
   </div>`;
+}
+
+
+// ---------------------------------------------------------------- online play
+// All of this is dead weight in the iOS build, where ON is null: the buttons
+// that reach it only exist in the web build's HTML.
+function seatName(i) { const s = ON ? ON.seats()[i] : null; return s ? s.name : 'Human'; }
+function pushOnline() { if (DBG) console.log('[nobles] push?', online()); if (online() && game) { const st = E.serialize(game); game.version = st.version; ON.push(st); } }
+function myName() { return (lsGet('nobles-name') || '').slice(0, 14); }
+function showWaiting() {
+  ui.remoteTurn = true; ui.aiTurn = false; ui.busy = false;
+  clearSel(); closeSheet(); renderAll();
+  const c = $('caption');
+  c.innerHTML = `Waiting for <b>${esc(dn(me()))}</b>`;
+  c.hidden = false;
+}
+// A board arrived from another player's browser. The whole game is replaced —
+// same as the classic page — so nothing local survives but the camera.
+async function applyRemote(state) {
+  let g;
+  try { g = E.hydrate(state); } catch (e) { console.error('[online] bad state', e); return; }
+  const prevRound = game ? game.round : 0;
+  const fresh = !game || ui.screen !== 'play';
+  game = g;
+  ui.skip = false; ui.busy = false; ui.remoteTurn = false;
+  clearSel(); closeSheet();
+  vis = snapshot();
+  if (fresh) {
+    ui.humans = 1; ui.tipsOn = false; ui.turnStamp = null; ui.lastHuman = null;
+    bounds = null; ui.staticDirty = true;
+    showScreen('play'); computeBounds(); fitHome(true);
+  }
+  renderAll();
+  if (fresh && yourSeat()) await showHouseCard(yourSeat());
+  // The event modal fires inside the turn that ends a round, which happens in
+  // one browser only. Everyone else sees the round tick over in the snapshot.
+  else if (game.round > prevRound && game.currentEvent && game.eventAge === 0 && game.phase === 'act') showEvent(null);
+  await afterCommand();
+}
+function renderOnline() {
+  const ok = !!(ON && ON.available());
+  $('online-note').textContent = ok ? '' : 'Online play is unavailable right now. Everything else still works offline.';
+  ['room-create', 'room-join'].forEach(a => { const b = document.querySelector(`[data-act="${a}"]`); if (b) b.disabled = !ok; });
+  const last = ok && ON.lastRoom();
+  const rj = $('btn-rejoin');
+  rj.hidden = !last;
+  if (last) rj.textContent = `Rejoin ${last}`;
+  const n = $('online-name'); if (!n.value) n.value = myName();
+}
+function renderLobby() {
+  const seats = ON ? ON.seats() : [];
+  $('lobby-code').textContent = ON && ON.code() ? ON.code() : '';
+  $('lobby-start').hidden = !(ON && ON.isHost());
+  $('lobby-hint').textContent = ON && ON.isHost()
+    ? 'Read the code out to your friends, then start when everyone is in. Empty seats are played by the computer.'
+    : 'Waiting for the host to start the game.';
+  $('lobby-seats').innerHTML = seats.map((q, i) => `
+    <div class="seat">
+      <div class="crest" style="color:${col(i)}">${ico(SEATS[i].crest, '')}</div>
+      <div class="nm">${esc(q.name)}${q.clientId === ON.clientId ? ' · you' : ''}${i === 0 ? ' · host' : ''}</div>
+    </div>`).join('') || '<p class="hint">Nobody has joined yet.</p>';
+}
+async function roomCreate() {
+  const name = ($('online-name').value || '').trim().slice(0, 14) || 'Host';
+  lsSet('nobles-name', name);
+  try { await ON.create(name); } catch (e) { toast(e.message || 'Could not make a room'); return; }
+  renderLobby(); showScreen('lobby');
+}
+async function roomJoin(code) {
+  const name = ($('online-name').value || '').trim().slice(0, 14) || 'Player';
+  lsSet('nobles-name', name);
+  let r;
+  try { r = await ON.join(code, name); } catch (e) { toast(e.message || 'Could not join'); return; }
+  if (r.rejoin && r.state) { await applyRemote(r.state); return; }   // game already running: straight to the board
+  renderLobby(); showScreen('lobby');
+}
+function roomLeave() {
+  if (ON) ON.leave();
+  game = null; ui.remoteTurn = false;
+  showScreen('online'); renderOnline();
+}
+function wireOnline() {
+  if (!ON) return;
+  ON.on('state', st => { applyRemote(st); });
+  ON.on('seats', (seats, started) => { if (ui.screen === 'lobby') { renderLobby(); } });
+  ON.on('error', msg => toast(msg));
 }
 
 // ---------------------------------------------------------------- boot
@@ -5315,12 +5675,13 @@ applyInsets();
   const z = +q.get('z'); if (z && z !== 1) { f.style.transform = `scale(${z})`; f.style.transformOrigin = 'top left'; f.style.left = '0px'; f.style.top = '0px'; }
 })();
 loadSettings();
+wireOnline();
 $('diff-range').addEventListener('input', ev => { setup.diff = DIFFS[+ev.target.value][0]; haptic('selection'); renderSetup(); });
 renderSetup();
 loadSaved();
 showScreen('title');
 try { N && N.send && N.send({ type: 'ready' }); } catch (e) {}
-window.Nobles = { get game() { return game; }, ui, view, settings, E, run, snapshot: () => vis, hexFromScreen, onHexTap, renderAll, toScreen, openSheet, closeSheet, fitHome, get saved() { return saved; } };
+window.Nobles = { get game() { return game; }, ui, view, settings, E, run, ON, online, yourSeat, get vers() { return game && game.version; }, snapshot: () => vis, hexFromScreen, onHexTap, renderAll, toScreen, openSheet, closeSheet, fitHome, get saved() { return saved; } };
 })();
 
 </script>
