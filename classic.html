@@ -3317,6 +3317,8 @@ function validateCastlePlacement(g, hex, player) {
   if (hex.tract !== player.homeTract) return { ok: false, why: 'Castle must stand in your home province (the highlighted tiles)' };
   if (hex.terrain !== 'grass') return { ok: false, why: 'Must be grassland' };
   if (hex.holding) return { ok: false, why: 'Tile occupied' };
+  // not on the rim of the map: a castle needs land on every side
+  if (neighbors(hex.q, hex.r).some(([nq, nr]) => !getHex(nq, nr))) return { ok: false, why: 'Too close to the edge of the map' };
   const existing = g.hexes.filter(h => h.holding && h.holding.type === 'castle');
   for (const c of existing) {
     if (hexDist(hex, c) < 3) return { ok: false, why: 'Too close to another castle (min 3 hexes)' };

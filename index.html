@@ -38,7 +38,7 @@
   --fs-body: calc(18px * var(--ts)); --fs-cap: calc(16px * var(--ts)); --fs-num: calc(24px * var(--ts));
   --fs-caption: calc(20px * var(--ts)); --fs-title: calc(26px * var(--ts)); --fs-card-h: calc(34px * var(--ts)); --fs-card-p: calc(22px * var(--ts));
   /* ---- sizes (iPhone 15 defaults; container queries below) ---- */
-  --chip-h: 56px; --disc: 48px; --act: 64px; --end: 76px; --hex: 74px; --seg: 52px;
+  --chip-h: 62px; --disc: 54px; --act: 70px; --end: 84px; --hex: 74px; --seg: 56px;
   --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 24px; --s6: 32px;
   --r-sm: 8px; --r-md: 14px; --r-lg: 22px; --r-pill: 999px;
   --shadow-chip: 0 3px 10px rgba(60,40,20,.16); --shadow-card: 0 18px 44px rgba(46,36,28,.35); --shadow-sheet: 0 -10px 30px rgba(46,36,28,.22);
@@ -48,9 +48,9 @@
   --sal: env(safe-area-inset-left, 0px); --sar: env(safe-area-inset-right, 0px); --sab: env(safe-area-inset-bottom, 0px); --sat: env(safe-area-inset-top, 0px);
 }
 .frame { position: fixed; inset: 0; container-type: size; background: var(--map); }
-@container (max-width: 700px)  { .frame > *, .title, .screen { --chip-h: 52px; --disc: 44px; --act: 60px; --end: 68px; --hex: 76px; --seg: 48px; --ts: .92; } }
-@container (min-width: 900px) and (max-width: 999px) { .frame > *, .title, .screen { --chip-h: 58px; --disc: 50px; --act: 66px; --end: 80px; --hex: 76px; } }
-@container (min-width: 1000px) { .frame > *, .title, .screen { --chip-h: 64px; --disc: 56px; --act: 72px; --end: 88px; --hex: 100px; --seg: 56px; --ts: 1.2; } }
+@container (max-width: 700px)  { .frame > *, .title, .screen { --chip-h: 58px; --disc: 50px; --act: 66px; --end: 76px; --hex: 76px; --seg: 52px; --ts: 1; } }
+@container (min-width: 900px) and (max-width: 999px) { .frame > *, .title, .screen { --chip-h: 64px; --disc: 56px; --act: 72px; --end: 88px; --hex: 76px; } }
+@container (min-width: 1000px) { .frame > *, .title, .screen { --chip-h: 72px; --disc: 62px; --act: 80px; --end: 98px; --hex: 100px; --seg: 60px; --ts: 1.3; } }
 
 /* ---------- base ---------- */
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -602,9 +602,9 @@ button:focus-visible, [role=button]:focus-visible { outline: 3px solid var(--ter
 .btn, .seg button, .seat .toggle button { font-size: calc(14px * var(--ts)) !important; }
 .primary { font-size: calc(16px * var(--ts)) !important; letter-spacing: .12em !important; }
 .btn.cont { font-size: var(--fs-help) !important; }
-.build .lbl, .endturn .lbl, #hud-round .lbl { font-size: calc(12px * var(--ts)) !important; letter-spacing: .12em !important; }
+.build .lbl, .endturn .lbl, #hud-round .lbl { font-size: calc(13px * var(--ts)) !important; letter-spacing: .12em !important; }
 .card.event .catpill, .lbl-n, .label, .kv .k, .lb .h, .row-i .k, .card .k { font-size: calc(12px * var(--ts)) !important; }
-.caption { font-family: var(--display); font-weight: 600; font-size: calc(16px * var(--ts)); letter-spacing: .01em; font-variant-numeric: lining-nums; white-space: nowrap; padding: 8px 18px; }
+.caption { font-family: var(--display); font-weight: 600; font-size: calc(17px * var(--ts)); letter-spacing: .01em; font-variant-numeric: lining-nums; white-space: nowrap; padding: 8px 18px; }
 .chip, .btn, .build, .act, .crest-disc, .caption, .race, #hud-round .lbl, .build .lbl, .endturn .lbl { border-color: rgba(107,74,51,.42); box-shadow: 0 1px 0 rgba(255,250,240,.7) inset, 0 2px 6px rgba(60,40,20,.14); }
 .chip, .btn, .caption, .race { background: rgba(250,246,236,.94); }
 .endturn { box-shadow: 0 0 0 3px rgba(250,246,236,.85), 0 4px 0 var(--terracotta-2), 0 8px 14px rgba(169,80,47,.3); }
@@ -2933,6 +2933,8 @@ function validateCastlePlacement(g, hex, player) {
   if (hex.tract !== player.homeTract) return { ok: false, why: 'Castle must stand in your home province (the highlighted tiles)' };
   if (hex.terrain !== 'grass') return { ok: false, why: 'Must be grassland' };
   if (hex.holding) return { ok: false, why: 'Tile occupied' };
+  // not on the rim of the map: a castle needs land on every side
+  if (neighbors(hex.q, hex.r).some(([nq, nr]) => !getHex(nq, nr))) return { ok: false, why: 'Too close to the edge of the map' };
   const existing = g.hexes.filter(h => h.holding && h.holding.type === 'castle');
   for (const c of existing) {
     if (hexDist(hex, c) < 3) return { ok: false, why: 'Too close to another castle (min 3 hexes)' };
