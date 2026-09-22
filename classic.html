@@ -1910,9 +1910,7 @@ function generateMap(numPlayers) {
     const roll = Math.random();
     let acc = 0, terrain = 'grass';
     for (const [t, w] of Object.entries(pool)) { acc += w; if (roll < acc) { terrain = t; break; } }
-    const rivers = [];
-    if (terrain === 'grass' && Math.random() < 0.12) rivers.push(Math.floor(Math.random() * 6));
-    const hex = { q, r, terrain, rivers, tract, fief: null, unit: null, holding: null };
+    const hex = { q, r, terrain, rivers: [], tract, fief: null, unit: null, holding: null };   // rivers are laid below, as streams
     hexes.push(hex);
     hexMap[hexKey(q, r)] = hex;
   });
@@ -2006,7 +2004,56 @@ function generateMap(numPlayers) {
     if (!carved) break;   // already joined by this route; nothing left to open
   }
 
+  // Rivers run as streams: each one follows a chain of hex edges corner to corner, five to
+  // eight edges long, so a river reads as a river rather than as one side of one hex. A river
+  // edge still just ends a move across it. Budget: 18% of open tiles' worth of edges (the old
+  // scatter was 12%), in one stream per ~30 open tiles.
+  layRivers(hexes, hexMap);
+
   return { hexes, hexMap, tractCenters: centers };
+}
+
+function layRivers(hexes, hexMap) {
+  const vkey = (h, i) => {   // corner i of hex h (corners at -30° + 60°i), shared by three hexes
+    const a = Math.PI / 180 * (60 * i - 30);
+    const x = Math.sqrt(3) * (h.q + h.r / 2) + Math.cos(a), y = 1.5 * h.r + Math.sin(a);
+    return Math.round(x * 100) + ',' + Math.round(y * 100);
+  };
+  // edge d of a hex (towards DIRS[d]) runs between the two corners either side of that direction
+  const cornersOf = (h, d) => { const [dq, dr] = DIRS[d]; const ang = Math.atan2(1.5 * dr, Math.sqrt(3) * (dq + dr / 2)) * 180 / Math.PI;
+    const i = Math.round((ang + 30) / 60); return [vkey(h, ((i % 6) + 6) % 6), vkey(h, ((i + 5) % 6 + 6) % 6)]; };
+  const edges = [], byCorner = {};
+  for (const h of hexes) for (let d = 0; d < 6; d++) {
+    const n = hexMap[hexKey(h.q + DIRS[d][0], h.r + DIRS[d][1])];
+    if (!n || hexKey(h.q, h.r) > hexKey(n.q, n.r)) continue;            // each edge once
+    if (h.terrain === 'mountain' || n.terrain === 'mountain') continue; // streams keep to the low ground
+    if (h.terrain !== 'grass' && n.terrain !== 'grass') continue;      // and need an open bank to sit on
+    const e = { h, n, d, c: cornersOf(h, d), used: false };
+    edges.push(e); for (const c of e.c) (byCorner[c] = byCorner[c] || []).push(e);
+  }
+  if (!edges.length) return;
+  const open = hexes.filter(h => h.terrain === 'grass').length;
+  const streams = Math.max(1, Math.round(open / 30)), budget = Math.max(5, Math.round(open * 0.18));
+  const usedCorners = {};
+  let laid = 0;
+  for (let s = 0; s < streams && laid < budget; s++) {
+    const free = edges.filter(e => !e.used && !usedCorners[e.c[0]] && !usedCorners[e.c[1]]);
+    if (!free.length) break;
+    let e = free[Math.floor(Math.random() * free.length)];
+    let want = 5 + Math.floor(Math.random() * 4);
+    let tail = e.c[Math.floor(Math.random() * 2)];
+    usedCorners[e.c[0]] = usedCorners[e.c[1]] = true;
+    while (e && want-- > 0 && laid < budget) {
+      e.used = true; laid++;
+      const on = e.h.terrain === 'grass' ? e.h : e.n;                     // store it on the open bank
+      on.rivers.push(on === e.h ? e.d : (e.d + 3) % 6);
+      const head = e.c[0] === tail ? e.c[1] : e.c[0];
+      const next = (byCorner[head] || []).filter(x => !x.used && !usedCorners[x.c[0] === head ? x.c[1] : x.c[0]]);
+      if (!next.length) break;
+      e = next[Math.floor(Math.random() * next.length)];
+      tail = head; usedCorners[e.c[0]] = usedCorners[e.c[1]] = true;
+    }
+  }
 }
 
 // ============================================================================
