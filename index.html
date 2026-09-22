@@ -4323,7 +4323,7 @@ function loadSaved() {
 function renderContinue() {
   const b = $('btn-continue');
   if (!b) return;
-  if (saved && ui.screen === 'title') { b.hidden = false; $('continue-label').textContent = `Continue — Round ${saved.meta.round}, ${saved.meta.turn}`; b.setAttribute('aria-label', `Continue, round ${saved.meta.round}, ${saved.meta.turn}'s turn`); }
+  if (saved && ui.screen === 'title') { b.hidden = false; $('continue-label').textContent = `Continue · Round ${saved.meta.round}`; b.setAttribute('aria-label', `Continue, round ${saved.meta.round}, ${saved.meta.turn}'s turn`); }
   else b.hidden = true;
 }
 
