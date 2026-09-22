@@ -1703,7 +1703,7 @@ const EVENTS = [
         const spot = ['castle', 'village', 'outpost']
           .map(t => g.hexes.find(h => h.holding && h.holding.type === t && h.holding.owner === p.id && !h.unit))
           .find(Boolean);
-        if (spot) { spot.unit = { type: 'spearman', owner: p.id, moved: true, attacked: true }; log(g, `Recruitment: ${p.name} gains a Spearman at their ${spot.holding.type}`, 'build'); }
+        if (spot) { spot.unit = { type: 'spearman', owner: p.id, moved: false, attacked: false }; log(g, `Recruitment: ${p.name} gains a Spearman at their ${spot.holding.type}`, 'build'); }   // a gifted unit may act the round it arrives
         else log(g, `Recruitment: ${p.name} has no free holding for the Spearman`);
       });
     }},
