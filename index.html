@@ -790,6 +790,11 @@ input, textarea, [contenteditable] { -webkit-user-select: text; user-select: tex
 @container (min-width: 1000px) and (min-height: 600px) { #s-new .page-body { padding-left: calc(20% + var(--sal)); } #s-new .page-head { padding-left: calc(20% + var(--sal)) !important; } #s-new .newgame { grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); } }
 /* house card: the "Your house" label carries that house's crest */
 .card.event .catpill .crest-ic { width: 24px; height: 24px; }
+/* New game boxes: slightly see-through parchment (Kevin 2026-11-08), a light blur keeps text crisp */
+#s-new .newgame .col, #s-new .newgame .col + .col { background: rgba(250,246,236,.82); -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px); }
+#s-new .page-head h2 { background: rgba(250,246,236,.86); -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px); }
+#s-new #seg-count button:not([aria-checked="true"]) { background: rgba(240,230,210,.7); }
+#s-new .crest.seatno { background: rgba(251,247,238,.6); }
 
 </style>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
