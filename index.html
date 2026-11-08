@@ -732,6 +732,65 @@ input, textarea, [contenteditable] { -webkit-user-select: text; user-select: tex
   #s-new .crest.seatno { width: 24px; height: 24px; font-size: 12px; }
 }
 
+/* ===== New game, round 3 (Kevin 2026-11-08): no haze — the painting shows everywhere except
+   inside two solid parchment boxes that hold larger controls ===== */
+#s-new .council::after { display: none; }
+#s-new .page-head { background: none; border: 0; }
+#s-new .page-head h2 { display: inline-block; flex: none; background: var(--paper); border: 1.5px solid var(--paper-edge); border-radius: var(--r-pill); padding: 6px 22px 7px; box-shadow: 0 6px 18px rgba(60,40,20,.28); }
+#s-new .page-head h2::after { display: none; }
+#s-new .page-head .spacer { display: block; flex: 1; }
+#s-new .page-head .btn.icon { background: var(--paper); box-shadow: 0 6px 18px rgba(60,40,20,.28); }
+#s-new .page-head .primary { box-shadow: 0 6px 18px rgba(60,40,20,.3); }
+#s-new .newgame { gap: 14px; align-items: start; }
+#s-new .newgame .col, #s-new .newgame .col + .col { background: var(--paper); border: 1.5px solid var(--paper-edge); border-radius: 18px; box-shadow: 0 10px 26px rgba(60,40,20,.32); padding: 12px 16px 14px; max-height: 100%; }
+#s-new .newgame .col + .col { border-left: 1.5px solid var(--paper-edge); }
+#s-new #seg-count { gap: 6px; }
+#s-new #seg-count button { width: 46px; height: 46px; font-size: calc(19px * var(--ts)); background: var(--paper-2); }
+#s-new .slider { height: 66px; }
+#s-new .seat { min-height: 48px; border-bottom-color: rgba(154,122,60,.3); }
+#s-new .seat:last-child { border-bottom: 0; }
+#s-new .crest.seatno { width: 32px; height: 32px; font-size: 15px; }
+#s-new .seat { grid-template-columns: 32px minmax(0, 1fr); gap: 10px; }
+#s-new .seat .toggle button { height: 38px; padding: 0 16px; font-size: calc(13px * var(--ts)); letter-spacing: .06em; }
+#s-new .label { font-size: calc(13px * var(--ts)) !important; }
+#s-new .hint, #s-new #diff-hint { font-size: calc(15px * var(--ts)) !important; }
+/* phones: the boxes take most of the width, the painting keeps a strip on the left */
+@container (max-width: 1000px) {
+  #s-new .page-head, #s-new .page-body { padding-left: calc(12% + var(--sal)); }
+  #s-new .page-body { padding-right: calc(12px + var(--sar)); padding-top: 2px; }
+  #s-new .page-head { min-height: 56px; }
+  #s-new .page-head h2 { font-size: calc(19px * var(--ts)); padding: 5px 18px 6px; }
+  #s-new .newgame { grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); gap: 10px; }
+  #s-new .newgame .col, #s-new .newgame .col + .col { padding: 10px 12px 12px; }
+  #s-new #seg-count { gap: 5px; }
+  #s-new #seg-count button { width: 42px; height: 42px; font-size: 17px; }
+  #s-new .seat { min-height: 44px; }
+  #s-new .seat .toggle button { height: 36px; padding: 0 13px; font-size: 12px; }
+  #s-new .label { font-size: 12px !important; margin: 2px 0 6px; }
+  #s-new .hint, #s-new #diff-hint { font-size: 14px !important; }
+}
+@container (max-width: 760px) {
+  #s-new .page-head, #s-new .page-body { padding-left: calc(6% + var(--sal)); }
+  #s-new #seg-count button { width: 36px; height: 36px; font-size: 15px; }
+  #s-new .seat .toggle button { height: 32px; padding: 0 8px; font-size: 10.5px; letter-spacing: .02em; }
+  #s-new .crest.seatno { width: 26px; height: 26px; font-size: 13px; }
+  #s-new .seat { grid-template-columns: 26px minmax(0, 1fr); gap: 6px; }
+}
+/* iPad: roomier boxes */
+@container (min-width: 1000px) and (min-height: 600px) {
+  #s-new .newgame .col, #s-new .newgame .col + .col { padding: 18px 22px 20px; }
+  #s-new #seg-count button { width: 54px; height: 54px; font-size: 21px; }
+  #s-new .seat { min-height: 58px; }
+  #s-new .seat .toggle button { height: 44px; padding: 0 20px; font-size: 15px; }
+}
+/* the title plate always starts clear of the back button */
+#s-new .page-head { padding-left: max(calc(12% + var(--sal)), calc(var(--sal) + 74px)) !important; }
+@container (max-width: 760px) { #s-new .page-head { padding-left: calc(var(--sal) + 70px) !important; } }
+/* iPad: the boxes start further left so the player tokens fit */
+@container (min-width: 1000px) and (min-height: 600px) { #s-new .page-body { padding-left: calc(20% + var(--sal)); } #s-new .page-head { padding-left: calc(20% + var(--sal)) !important; } #s-new .newgame { grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); } }
+/* house card: the "Your house" label carries that house's crest */
+.card.event .catpill .crest-ic { width: 24px; height: 24px; }
+
 </style>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
@@ -5873,7 +5932,7 @@ function showHouseCard(p) {
   const art = `unit-${p.house.key === 'marshal' ? 'spearman' : p.house.key === 'surveyor' ? 'knight' : 'bowman'}`;
   $('event-card').innerHTML = `<svg class="corner tl" aria-hidden="true"><use href="#map-border"/></svg><svg class="corner tr" aria-hidden="true"><use href="#map-border"/></svg>
     ${portrait ? `<div class="art"><svg viewBox="0 0 100 150" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><use href="#${portrait[0]}"/></svg></div>` : `<div class="art house" style="color:${col(p.id)}"><svg viewBox="0 0 100 100" aria-hidden="true"><use href="#${crestOf(p.id)}" x="14" y="14" width="72" height="72"/></svg></div>`}
-    <div class="body"><div class="catpill">${ico('ic-houses')}Your house</div><h3>${esc(p.house.name)}</h3><p>${esc(p.house.power)}</p><div class="actions"><button class="primary" data-act="event-close">Take the field</button></div></div>`;
+    <div class="body"><div class="catpill"><svg class="crest-ic" style="color:${col(p.id)}" aria-hidden="true"><use href="#${crestOf(p.id)}"/></svg>Your house</div><h3>${esc(p.house.name)}</h3><p>${esc(p.house.power)}</p><div class="actions"><button class="primary" data-act="event-close">Take the field</button></div></div>`;
   $('v-event').hidden = false;
   haptic('medium');
   return new Promise(res => { ui.eventResolve = res; });
