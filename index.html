@@ -1735,7 +1735,7 @@ const EVENTS = [
       poorest.forEach(p => p.gold += share);
       log(g, `Tithe: ${poorest.map(p=>p.name).join(', ')} ${poorest.length === 1 ? 'receives' : 'each receive'} ${share}g`);
     }},
-  { name: 'Winter', cat: 'tempo', duration: 2, effect: 'Lakes freeze — walk across them and end your turn on the ice. Ice is a road, not land (no fief, no tax). Supply traces through it. Rivers also freeze. LASTS TWO ROUNDS — when it thaws, anything supplied only through ice is cut off.', flag: 'winter' },
+  { name: 'Winter', cat: 'tempo', duration: 2, effect: 'Lakes freeze — walk across them and end your turn on the ice. Ice is a road, not land (no fief, no tax). Supply traces through it. LASTS TWO ROUNDS — when it thaws, anything supplied only through ice is cut off.', flag: 'winter' },
   // Fog / Clear Skies / Royal Envoy retired: a bowman was on the board in under 5% of draws and
   // Envoy does nothing offline. Kept in EVENTS so saved games index correctly.
   { name: 'Fog', cat: 'tempo', effect: 'No Bowman ranged attacks', flag: 'fog', retired: true },
@@ -2202,7 +2202,7 @@ const TUTORIAL_CARDS = {
   },
   movement: {
     title: '🗺️ Movement & Conquering',
-    body: `Every tile you move onto becomes <b>your fief</b>. Spearmen/Bowmen move 1, <b>Knights move 2</b> and claim both tiles they pass through.<br><br>Forests and rivers end movement early. Mountains/lakes are impassable — except during <b>Winter</b>, when lakes freeze and you can walk across.`
+    body: `Every tile you move onto becomes <b>your fief</b>. Spearmen/Bowmen move 1, <b>Knights move 2</b> and claim both tiles they pass through.<br><br>Forests end movement early (rivers are just scenery). Mountains/lakes are impassable — except during <b>Winter</b>, when lakes freeze and you can walk across.`
   },
   supply: {
     title: '📦 Supply Lines',
@@ -2414,10 +2414,11 @@ function getValidMoves(hex) {
 
         // Forced March is "+1 movement for all", but a forest zeroes the rest of the
         // budget — so under that card a knight that stepped into trees got nothing from
-        // it at all. Under Forced March a forest costs a step like open ground. Rivers
-        // still end a move: you ford and re-form on the far bank.
-        const forestStops = !G.eventFlags.forcedMarch;
-        const endsMove = (forestStops && nh.terrain === 'forest') || hasRiverBetween(node.h, nh) || (nh.unit && nh.unit.owner !== hex.unit.owner) || (nh.holding && nh.holding.owner !== hex.unit.owner);
+        // it at all. Under Forced March a forest costs a step like open ground.
+        // Rivers are scenery only (Kevin 2026-11-08): they never stop a move. They used to,
+        // which made knights stop after one tile for no visible reason.
+        const forestStop = !G.eventFlags.forcedMarch && nh.terrain === 'forest';
+        const endsMove = forestStop || (nh.unit && nh.unit.owner !== hex.unit.owner) || (nh.holding && nh.holding.owner !== hex.unit.owner);
 
         visited.add(key);
         // path = tiles passed through to get here (Knight conquers these)
@@ -2426,7 +2427,8 @@ function getValidMoves(hex) {
         results.push({
           hex: nh,
           path,
-          endsMove,        // executeMove needs this — forest/river/combat exhaust the budget
+          endsMove,        // executeMove needs this — forest/combat exhaust the budget
+          stop: forestStop ? 'forest' : null,   // why a plain move ended early (UI explains it)
           combat: nh.unit && nh.unit.owner !== hex.unit.owner,
           siege: nh.holding && nh.holding.owner !== hex.unit.owner && !nh.unit
         });
@@ -2717,6 +2719,7 @@ function executeBowmanAttackCore(from, target, targetType) {
   const unit = from.unit;
   unit.attacked = true;   // blocks further ranged attacks (same-turn gate)
   unit.rangedUsed = true; // blocks passive siege contribution (shot is spent)
+  unit.moved = true;      // shooting ends the bowman's turn: move-then-shoot is fine, shoot-then-move is not
   if (G.eventFlags.peace) { log(G, 'Peace Treaty: ranged attack blocked'); return; }
   if (targetType === 'unit') {
     resolveCombat(from, target, true);
@@ -3691,8 +3694,8 @@ function brutalDefendSpend(g, p) {
 
 function aiActBrutal(g, p) {
   brutalDefendSpend(g, p);
-  brutalShoot(g, p);
-  if (g.phase === 'over') return;
+  // Bowmen move first, then shoot: a shot ends a bowman's turn (Kevin 2026-11-08),
+  // so shooting before moving froze them in place and let sieges stall out.
   brutalMoves(g, p);
   if (g.phase === 'over') return;
   brutalShoot(g, p);
@@ -4036,10 +4039,13 @@ function move(game, fromHex, toHex) {
   if (!from.unit || from.unit.owner !== game.turn) return fail(game, 'Not your unit');
   const target = getValidMoves(from).find(m => m.hex === to);
   if (!target) return fail(game, 'That tile is out of reach');
+  const unit = from.unit;
   executeMove(from, to, target.path, target.endsMove);
   // Knight with a step left (split move) — the UI can keep it lit.
   const more = (to.unit && to.unit.owner === game.turn && !to.unit.moved) ? getValidMoves(to) : [];
-  return result(game, { canContinue: more.length > 0, nextMoves: more });
+  // A plain move that ended with budget unspent: say why (a forest), so it never feels random.
+  const cut = to.unit === unit && target.stop && !target.combat && !target.siege && (unit.movesUsed || 0) < moveRange(unit) ? target.stop : null;
+  return result(game, { canContinue: more.length > 0, nextMoves: more, stoppedBy: cut });
 }
 
 function ranged(game, fromHex, targetHex, targetType) {
@@ -5676,6 +5682,7 @@ async function onHexTap(h) {
     haptic(ui.hot.has(k) ? 'heavy' : 'light');
     await run(() => E.move(game, from, h), r => {
       if (r.canContinue && r.nextMoves && r.nextMoves.length) lightMoves(h, r.nextMoves); else clearSel();
+      if (r.stoppedBy === 'forest') toast('Entering a forest ends the move');
     });
     return;
   }
@@ -6232,7 +6239,7 @@ function renderHowto() {
     ['Three roads to the crown', lessonPic(hexPic('hex-grass-b2', hold('castle', 'var(--h-crimson)'))),
       `Reach <b>${W.pop} population</b> (villages and castles), <b>${W.income} income</b> a turn (fiefs plus population; ${RULES.winFor(2).income} in a two-player game), or <b>Conquest</b>: capture any enemy castle and the game ends at once. Population and income are checked at the end of each round. If two houses cross a line in the same round, the one further past it wins.`],
     ['Move and claim', lessonPic(hexPic('hex-grass-b1', `<use href="#hex-lit" width="100" height="100"/>` + figure('knight', 'var(--h-azure)', 20, 20, 60))),
-      `Tap a unit and every tile it can reach lights up gold. Tap one to go. <b>Every tile you step on becomes your fief.</b> Spearmen and bowmen move 1, knights move 2 and claim both tiles. Forests and rivers end a move, though <b>Forced March</b> lets you ride straight through trees. Mountains and lakes block, except lakes in <b>Winter</b>.`],
+      `Tap a unit and every tile it can reach lights up gold. Tap one to go. <b>Every tile you step on becomes your fief.</b> Spearmen and bowmen move 1, knights move 2 and claim both tiles. Forests end a move, though <b>Forced March</b> lets you ride straight through trees. Rivers are just scenery. Mountains and lakes block, except lakes in <b>Winter</b>.`],
     ['Supply lines', lessonPic(hexPic('hex-grass-b3', `<use href="#ic-supply" x="30" y="26" width="40" height="40" color="#241A12"/><use href="#ic-skull" x="58" y="58" width="30" height="30" color="#B23A2E"/>`)),
       `Each unit costs <b>1 gold per tile</b> back to your nearest holding, paid when you end your turn, and supply only traces <b>through your own fiefs</b>. A unit with no path home <b>deserts</b>. Outposts make supply cheaper but do not keep units alive. The gold chip shows the bill as a red number.`],
     ['Build', lessonPic(hexPic('hex-grass-b2', hold('village', 'var(--h-verdant)'))),
