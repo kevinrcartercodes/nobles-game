@@ -699,6 +699,38 @@ input, textarea, [contenteditable] { -webkit-user-select: text; user-select: tex
 .crest.seatno { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; border: 1.5px solid rgba(110,80,50,.55); font-family: Cinzel, var(--display); font-weight: 700; font-size: 14px; color: var(--ink); background: rgba(251,247,238,.7); }
 /* houses page: the house's own crest, large, next to its portrait */
 .house-row .crest.hcrest { width: 40px; height: 40px; }
+/* New game on phone widths (most iPhones are 844–852 pt with the notch margins): the painting
+   keeps a narrower strip and the controls get the room they need */
+@container (max-width: 1000px) {
+  #s-new .council::after { background: linear-gradient(90deg, rgba(246,240,228,0) 6%, rgba(246,240,228,.66) 17%, rgba(246,240,228,.86) 26%, rgba(246,240,228,.92) 100%); }
+  #s-new .page-head, #s-new .page-body { padding-left: calc(14% + var(--sal)); }
+  #s-new .page-head { min-height: 54px; padding-top: 6px; padding-bottom: 2px; }
+  #s-new .page-head h2 { font-size: calc(22px * var(--ts)); }
+  #s-new .page-head .btn.icon { top: 8px; width: 44px; height: 44px; min-height: 44px; }
+  #s-new .page-head .primary { min-height: 46px; height: 46px; padding: 0 20px; }
+  #s-new .newgame { gap: 0 16px; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); }
+  #s-new .newgame .col + .col { padding-left: 14px; }
+  #s-new #seg-count { gap: 5px; flex-wrap: nowrap; }
+  #s-new #seg-count button { width: 36px; height: 36px; font-size: calc(15px * var(--ts)); }
+  #s-new .label { font-size: calc(12px * var(--ts)) !important; margin: 4px 0 6px; }
+  #s-new .slider { height: 60px; }
+  #s-new .seat { min-height: 42px; gap: 8px; padding: 2px 0; grid-template-columns: 28px minmax(0, 1fr); }
+  #s-new .seat .toggle { justify-self: start; }
+  #s-new .seat .toggle button { height: 30px; padding: 0 10px; font-size: calc(11px * var(--ts)); letter-spacing: .04em; }
+  #s-new .hint, #s-new #diff-hint { font-size: calc(14px * var(--ts)) !important; }
+}
+#lobby-limit { flex-wrap: wrap; gap: 6px; } #lobby-limit button { min-width: 0; padding: 0 12px; height: 40px; font-size: calc(13px * var(--ts)); }
+#s-new .seat { grid-template-columns: 28px minmax(0, 1fr); } #s-new .seat .toggle { justify-self: start; }
+@container (max-width: 760px) {
+  #s-new .page-head, #s-new .page-body { padding-left: calc(9% + var(--sal)); }
+  #s-new .page-body { padding-right: calc(10px + var(--sar)); }
+  #s-new .newgame { gap: 0 12px; }
+  #s-new .newgame .col + .col { padding-left: 10px; }
+  #s-new #seg-count button { width: 32px; height: 32px; font-size: 14px; }
+  #s-new .seat .toggle button { padding: 0 7px; font-size: 10px; letter-spacing: .02em; }
+  #s-new .seat { gap: 6px; grid-template-columns: 24px minmax(0, 1fr); }
+  #s-new .crest.seatno { width: 24px; height: 24px; font-size: 12px; }
+}
 
 </style>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -6240,7 +6272,7 @@ async function loadOpenGames() {
       <div class="toggle"><button data-act="open-join:${esc(g.code)}">Join</button></div></div>`).join('')
     : '<p class="hint">No open games right now. Start one and turn on “Let anyone join”.</p>';
 }
-const TURN_LIMITS = [[0, 'None'], [60, '1 min'], [120, '2 min'], [300, '5 min']];
+const TURN_LIMITS = [[0, 'None'], [180, '3 min'], [600, '10 min'], [1800, '30 min'], [3600, '1 hr'], [43200, '12 hr'], [86400, '24 hr']];
 function openInfo() { const seats = ON.seats(); return { name: (seats[0] && seats[0].name) || myName(), seated: seats.length }; }
 function renderLobby() {
   const seats = ON ? ON.seats() : [];
@@ -6329,7 +6361,8 @@ async function turnClock() {
   const left = online() && game && (game.phase === 'act' || game.phase === 'setup-castle') && ui.screen === 'play' ? ON.turnLeft() : null;
   if (left == null) { if (el) el.hidden = true; return; }
   const s = Math.max(0, Math.ceil(left));
-  if (el) { el.hidden = false; el.textContent = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; el.classList.toggle('low', s <= 15); }
+  const hms = s >= 3600 ? `${Math.floor(s / 3600)}:${String(Math.floor(s % 3600 / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}` : `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+  if (el) { el.hidden = false; el.textContent = hms; el.classList.toggle('low', s <= 15); }
   const key = `${game.round}:${game.turn}:${game.phase}`;
   if (ui.busy || me().ai || clockFired === key) return;
   // castle placement times out too: the castle goes on the first open site
