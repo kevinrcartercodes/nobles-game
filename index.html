@@ -695,6 +695,10 @@ input, textarea, [contenteditable] { -webkit-user-select: text; user-select: tex
 .victory.hasart .actions { justify-content: flex-end; flex-wrap: wrap; }
 @container (max-height: 420px) { .victory.hasart .vside { padding: 12px 16px; gap: 8px; } .victory.hasart .seal { width: 64px; height: 64px; } .victory.hasart .seal svg.c { width: 28px; height: 28px; } .victory.hasart h1 { font-size: calc(28px * var(--ts)); } .victory.hasart .actions .btn, .victory.hasart .actions .primary { min-height: 46px; padding: 0 14px; } }
 @container (min-width: 1000px) and (min-height: 600px) { .victory.hasart { width: 900px; max-width: 80%; } .victory.hasart .vart { min-height: 520px; } .victory.hasart .vside { padding: 28px 32px; gap: 18px; } .victory.hasart .seal { width: 110px; height: 110px; } .victory.hasart .seal svg.c { width: 46px; height: 46px; } }
+/* seats before houses are dealt carry a number, not a crest */
+.crest.seatno { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; border: 1.5px solid rgba(110,80,50,.55); font-family: Cinzel, var(--display); font-weight: 700; font-size: 14px; color: var(--ink); background: rgba(251,247,238,.7); }
+/* houses page: the house's own crest, large, next to its portrait */
+.house-row .crest.hcrest { width: 40px; height: 40px; }
 
 </style>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -4205,6 +4209,22 @@ const Online = (() => {
   // document. The rules allow /games/<code> only and forbid listing the collection,
   // so the directory is itself a room-shaped document whose `state` maps code → info.
   const OPEN_DOC = 'LOBBY';
+  // Push: an app player's Expo push token rides on their seat entry (key `pt`). Whoever hands
+  // the turn to them sends the "your turn" through Expo's push service. A plain-text body keeps
+  // it a simple request, so a browser on the website can send it too (the response is opaque).
+  let pushToken = null; const notified = new Set();
+  const HOUSE_NAMES = { architect: 'Architect', castellan: 'Castellan', chancellor: 'Chancellor', surveyor: 'Surveyor', marshal: 'Marshal', quartermaster: 'Quartermaster' };
+  const seatEntry = (name, fallback) => { const e = { clientId: CLIENT_ID, name: name || fallback, v: ROOM_VERSION }; if (pushToken) e.pt = pushToken; return e; };
+  function notifyTurn(state) {
+    const p = state && state.players && state.players[state.turn];
+    if (!p || p.ai || !p.clientId || p.clientId === CLIENT_ID || state.phase === 'over') return;
+    const seat = seats.find(x => x.clientId === p.clientId);
+    const key = `${room}:${state.round}:${state.turn}`;
+    if (!seat || !seat.pt || notified.has(key)) return;
+    notified.add(key);
+    const body = JSON.stringify({ to: seat.pt, title: 'Your turn in Nobles', body: `Round ${state.round} — the ${HOUSE_NAMES[p.house] || 'house'} awaits your orders.`, sound: 'default', data: { room } });
+    try { fetch('https://exp.host/--/api/v2/push/send', { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain' }, body }).catch(() => {}); } catch (e) {}
+  }
   let isOpen = false;
 
   const remember = code => { try { code ? localStorage.setItem(LAST_ROOM, code) : localStorage.removeItem(LAST_ROOM); } catch (e) {} };
@@ -4253,7 +4273,7 @@ const Online = (() => {
     const code = makeCode();
     await DB.collection(COLL).doc(code).set({
       hostId: CLIENT_ID,
-      seats: [{ clientId: CLIENT_ID, name: name || 'Host', v: ROOM_VERSION }],
+      seats: [seatEntry(name, 'Host')],
       state: null,
       createdAt: Date.now(),
     });
@@ -4276,7 +4296,7 @@ const Online = (() => {
     if (!mine && !started) {
       // arrayUnion is idempotent, so a double tap cannot seat you twice.
       await DB.collection(COLL).doc(code).update({
-        seats: firebase.firestore.FieldValue.arrayUnion({ clientId: CLIENT_ID, name: name || 'Player', v: ROOM_VERSION }),
+        seats: firebase.firestore.FieldValue.arrayUnion(seatEntry(name, 'Player')),
       });
     }
     room = code; host = data.hostId === CLIENT_ID; lastVersion = 0; remember(code);
@@ -4292,6 +4312,7 @@ const Online = (() => {
       lastVersion = state.version || 0;
       const k = keyOf(state); if (k !== turnKey) { turnKey = k; turnAt = Date.now(); }
       if (isOpen) setOpen(false);               // the game has begun: off the open list
+      notifyTurn(state);
       DB.collection(COLL).doc(room).set({ state: { ...toWire(state), _tl: turnLimit, _ta: turnAt } }, { merge: true })
         .catch(e => { console.error('[online] push failed', e); if (handlers.error) handlers.error('Could not reach the room'); });
     } catch (e) { console.error('[online] push failed', e); }
@@ -4347,6 +4368,14 @@ const Online = (() => {
     lastRoom,
     forget: () => remember(null),
     create, join, push, leave, setOpen, listOpen,
+    // a token that arrives after you sat down is written onto your seat entry
+    setPushToken: async t => {
+      pushToken = t || null;
+      if (!DB || !room || !pushToken) return;
+      const mine = seats.find(x => x.clientId === CLIENT_ID);
+      if (!mine || mine.pt === pushToken) return;
+      try { await DB.collection(COLL).doc(room).update({ seats: seats.map(x => x.clientId === CLIENT_ID ? { ...x, pt: pushToken } : x) }); } catch (e) {}
+    },
     isOpen: () => isOpen,
     setTurnLimit: sec => { turnLimit = Math.max(0, sec | 0); },
     turnLimit: () => turnLimit,
@@ -4380,8 +4409,14 @@ const SEATS = [
   { name: 'Violet',  tok: 'violet',  crest: 'crest-moon' },
   { name: 'Ember',   tok: 'ember',   crest: 'crest-flame' },
 ];
-const col = i => `var(--h-${SEATS[i].tok})`;
-const crestOf = i => { const p = HEX_ART[`ft-${SEATS[i].crest.replace('-', '')}`]; return p ? p[0] : SEATS[i].crest; };   // painted crest when the art set has one
+// Each house owns one colour and crest (Kevin, 2026-11-07: a persona must always match the
+// coloured crest at the top of the game). Seats only borrow them once houses are dealt.
+const HOUSE_IDENT = { marshal: 0, chancellor: 1, castellan: 2, quartermaster: 3, surveyor: 4, architect: 5 };
+const identOf = i => { const p = game && game.players && game.players[i]; return p && p.house && HOUSE_IDENT[p.house.key] != null ? HOUSE_IDENT[p.house.key] : i; };
+const col = i => `var(--h-${SEATS[identOf(i)].tok})`;
+const crestId = k => { const p = HEX_ART[`ft-${SEATS[k].crest.replace('-', '')}`]; return p ? p[0] : SEATS[k].crest; };   // painted crest when the art set has one
+const crestOf = i => crestId(identOf(i));
+const houseCrest = key => crestId(HOUSE_IDENT[key]);
 const DIFFS = [
   ['tutorial', 'Tutorial', 'Gentle computer, tips as you play'],
   ['easy', 'Easy', 'A passive computer'],
@@ -4548,7 +4583,7 @@ function renderSetup() {
   $('diff-hint').innerHTML = `<b>${DIFFS[di][1]}</b> — ${DIFFS[di][2]}`;
   $('seats').innerHTML = SEATS.slice(0, setup.count).map((s, i) => `
     <div class="seat">
-      <div class="crest" style="color:${col(i)}">${ico(s.crest, '')}</div>
+      <div class="crest seatno" aria-hidden="true">${i + 1}</div>
       <div class="toggle" role="radiogroup" aria-label="Seat ${i + 1}">
         <button role="radio" aria-checked="${!setup.seats[i]}" data-act="seat:${i}:human"${i < setup.locked ? ' disabled' : ''}>${i < setup.locked ? esc(seatName(i)) : 'Human'}</button>
         <button role="radio" aria-checked="${!!setup.seats[i]}" data-act="seat:${i}:ai"${i < setup.locked ? ' disabled' : ''}>Computer</button>
@@ -6014,7 +6049,7 @@ document.addEventListener('click', async ev => {
   if (ui.spotKey && ui.spotTap && (btn.id === 'hud-end' || btn.id === 'hud-round' || btn.closest('.actionbar'))) spotHide();
   switch (verb) {
     case 'new': setup.locked = 0; if (online()) roomLeave(); renderSetup(); showScreen('new'); break;
-    case 'online': renderOnline(); showScreen('online'); break;
+    case 'online': askForPush(); renderOnline(); showScreen('online'); break;
     case 'room-create': await roomCreate(); break;
     case 'room-join': await roomJoin($('online-code').value); break;
     case 'room-rejoin': await roomJoin(ON && ON.lastRoom()); break;
@@ -6130,9 +6165,9 @@ function renderHouses() {
         if (!q && !shownIdle && Object.keys(held).length) { shownIdle = true; out += `<div class="label" style="margin-top:6px">Not in this game</div>`; }
         const mine = you && q && q.id === you.id;
         const seat = q
-          ? `<div class="seat-of" style="color:${col(q.id)}"><svg aria-label="${esc(dn(q))} seat"><use href="#${crestOf(q.id)}"/></svg>${mine ? '<span class="tagme">you</span>' : ''}</div>`
+          ? `<div class="seat-of">${mine ? '<span class="tagme">you</span>' : ''}</div>`
           : `<div class="seat-of empty" aria-hidden="true"></div>`;
-        out += `<div class="house-row${q ? ' held' : Object.keys(held).length ? ' idle' : ''}">${seat}${HEX_ART[`artp-house${h.key}`] ? `<div class="portrait"><svg viewBox="0 0 100 150" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><use href="#${HEX_ART[`artp-house${h.key}`][0]}"/></svg></div>` : ''}<div class="crest">${ico(HOUSE_ICON[h.key] || 'ic-houses', '')}</div><div><div class="nm">${esc(h.name)}</div><div class="pk">${esc(h.power)}</div></div></div>`;
+        out += `<div class="house-row${q ? ' held' : Object.keys(held).length ? ' idle' : ''}">${seat}${HEX_ART[`artp-house${h.key}`] ? `<div class="portrait"><svg viewBox="0 0 100 150" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><use href="#${HEX_ART[`artp-house${h.key}`][0]}"/></svg></div>` : ''}<div class="crest hcrest" style="color:var(--h-${SEATS[HOUSE_IDENT[h.key]].tok})">${ico(houseCrest(h.key), '')}</div><div><div class="nm">${esc(h.name)}</div><div class="pk">${esc(h.power)}</div></div></div>`;
       }
       return out;
     })()}
@@ -6222,7 +6257,7 @@ function renderLobby() {
   }
   $('lobby-seats').innerHTML = seats.map((q, i) => `
     <div class="seat">
-      <div class="crest" style="color:${col(i)}">${ico(SEATS[i].crest, '')}</div>
+      <div class="crest seatno" aria-hidden="true">${i + 1}</div>
       <div class="nm">${esc(q.name)}${q.clientId === ON.clientId ? ' · you' : ''}${i === 0 ? ' · host' : ''}</div>
     </div>`).join('') || '<p class="hint">Nobody has joined yet.</p>';
 }
@@ -6303,6 +6338,14 @@ async function turnClock() {
   const rank = aiDriverRank();
   if (rank >= 0 && !ON.isMine(me()) && left <= -(20 + rank * 8)) { clockFired = key; toast(`Time’s up for the ${dn(me())}`); await timeUp(); }
 }
+// Push permission is asked only of players who open Play online, and only in the app. iOS shows
+// its own prompt once; later calls just refresh the token.
+function askForPush() {
+  if (!N || !N.send || !ON) return;
+  N.onPushToken = t => { lsSet('nobles-push-token', t); ON.setPushToken(t); };
+  const t = lsGet('nobles-push-token'); if (t) ON.setPushToken(t);
+  try { N.send({ type: 'push-register' }); } catch (e) {}
+}
 function wireOnline() {
   if (!ON) return;
   ON.on('state', st => { applyRemote(st); });
@@ -6344,7 +6387,7 @@ showScreen('title');
 (function joinFromLink() {
   const c = (new URLSearchParams(location.search).get('join') || '').toUpperCase();
   if (!ON || !/^[A-Z0-9]{4,8}$/.test(c) || !$('s-online')) return;
-  renderOnline(); $('online-code').value = c; showScreen('online');
+  askForPush(); renderOnline(); $('online-code').value = c; showScreen('online');
 })();
 try { N && N.send && N.send({ type: 'ready' }); } catch (e) {}
 window.Nobles = { get game() { return game; }, ui, view, settings, E, run, ON, online, yourSeat, get vers() { return game && game.version; }, snapshot: () => vis, hexFromScreen, onHexTap, renderAll, toScreen, openSheet, closeSheet, fitHome, get saved() { return saved; } };
