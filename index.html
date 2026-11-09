@@ -796,6 +796,24 @@ input, textarea, [contenteditable] { -webkit-user-select: text; user-select: tex
 #s-new #seg-count button:not([aria-checked="true"]) { background: rgba(240,230,210,.7); }
 #s-new .crest.seatno { background: rgba(251,247,238,.6); }
 
+/* lobby seat plan: joined friends, seats waiting for a friend, seats the computer will play */
+#lobby-seats .seat.waiting { border-style: dashed; background: transparent; box-shadow: none; }
+#lobby-seats .seat.cpu .nm { opacity: .75; }
+#lobby-seats .seat .toggle button { white-space: nowrap; padding: 0 12px; }
+#lobby-rules { margin: 4px 0 10px; }
+#lobby-count, #lobby-diff { flex-wrap: wrap; gap: 6px; }
+#lobby-count button, #lobby-diff button { min-width: 0; padding: 0 12px; height: 40px; font-size: calc(13px * var(--ts)); }
+#lobby-count button[disabled] { opacity: .35; }
+#claim-watch { margin-top: 12px; }
+/* lobby: room code and Share side by side so the seats show without scrolling on a phone */
+#s-lobby .page-body { display: grid; grid-template-columns: 1fr 1fr; column-gap: 10px; align-content: start; }
+#s-lobby .page-body > * { grid-column: 1 / -1; }
+#s-lobby #lobby-code { grid-column: 1; grid-row: 1; margin: 0; font-size: calc(28px * var(--ts)); letter-spacing: .14em; padding: 8px 4px; }
+#s-lobby #lobby-share { grid-column: 2; grid-row: 1; margin: 0; height: auto; min-height: 52px; align-self: stretch; white-space: nowrap; }
+#s-lobby #lobby-hint { margin: 8px 0 2px; }
+#lobby-seats { overflow: visible; -webkit-mask-image: none; mask-image: none; padding-bottom: 2px; flex: none; min-height: auto; height: auto; }
+#s-lobby .page-body > .label { margin-top: 4px; }
+
 </style>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
@@ -1499,13 +1517,18 @@ input, textarea, [contenteditable] { -webkit-user-select: text; user-select: tex
       <button class="roomcode" id="lobby-code" data-act="room-copy" aria-label="Room code, tap to copy"></button>
       <p class="hint" id="lobby-hint"></p>
       <button class="primary" id="lobby-share" data-act="room-invite" aria-label="Share the code"><svg class="ico"><use href="#ic-endturn"/></svg>Share code</button>
+      <div class="label">Seats</div>
+      <div class="seats fits" id="lobby-seats"></div>
+      <p class="hint" id="lobby-rules"></p>
       <div class="hostonly" id="lobby-host">
-        <button class="btn opentoggle" id="lobby-open" data-act="room-open" role="switch" aria-checked="false">Let anyone join</button>
+        <div class="label">Players</div>
+        <div class="seg" id="lobby-count" role="radiogroup" aria-label="Number of players"></div>
+        <div class="label">Computer strength</div>
+        <div class="seg" id="lobby-diff" role="radiogroup" aria-label="Computer strength"></div>
         <div class="label">Time limit per turn</div>
         <div class="seg" id="lobby-limit" role="radiogroup" aria-label="Time limit per turn"></div>
+        <button class="btn opentoggle" id="lobby-open" data-act="room-open" role="switch" aria-checked="false">Let anyone join</button>
       </div>
-      <div class="label">In the room</div>
-      <div class="seats" id="lobby-seats"></div>
     </div>
   </section>
 
@@ -1513,11 +1536,11 @@ input, textarea, [contenteditable] { -webkit-user-select: text; user-select: tex
   <section class="page screen" id="s-claim">
     <header class="page-head">
       <button class="btn icon" data-act="room-leave" aria-label="Back"><svg class="ico"><use href="#ic-back"/></svg></button>
-      <h2>Take a seat</h2>
+      <h2>Joining</h2>
     </header>
     <div class="page-body scroll">
-      <p class="hint">This game is under way. Take the seat of a player who has left, or one the computer is holding. Everything that house owns comes with it.</p>
-      <div class="seats" id="claim-seats"></div>
+      <p class="hint" id="claim-hint">This game is under way. The host is giving you one of the computer’s seats…</p>
+      <button class="btn" id="claim-watch" data-act="claim-watch" hidden>Watch the game</button>
     </div>
   </section>
 
@@ -4394,8 +4417,10 @@ const Online = (() => {
     if (!isOurRoom(data)) throw new Error('That code is for the classic page — open Classic and join there');
     const mine = (data.seats || []).some(s => s.clientId === CLIENT_ID);
     const started = !!data.state;
-    if (!mine && !started && (data.seats || []).length >= 6) throw new Error('That room is full');
-    if (!mine && !started) {
+    if (!mine && (data.seats || []).length >= 6) throw new Error('That room is full');
+    if (!mine) {
+      // Before the start you take the next seat; after it, the host's browser hands you a
+      // computer seat at random (see assignJoiners in app.js).
       // arrayUnion is idempotent, so a double tap cannot seat you twice.
       await DB.collection(COLL).doc(code).update({
         seats: firebase.firestore.FieldValue.arrayUnion(seatEntry(name, 'Player')),
@@ -4413,7 +4438,6 @@ const Online = (() => {
     try {
       lastVersion = state.version || 0;
       const k = keyOf(state); if (k !== turnKey) { turnKey = k; turnAt = Date.now(); }
-      if (isOpen) setOpen(false);               // the game has begun: off the open list
       notifyTurn(state);
       DB.collection(COLL).doc(room).set({ state: { ...toWire(state), _tl: turnLimit, _ta: turnAt } }, { merge: true })
         .catch(e => { console.error('[online] push failed', e); if (handlers.error) handlers.error('Could not reach the room'); });
@@ -4436,7 +4460,7 @@ const Online = (() => {
     isOpen = !!on;
     try {
       const ref = await ensureOpenDoc();
-      await ref.update(on ? { [`state.${code}`]: { n: String(info && info.name || 'Host').slice(0, 14), s: info && info.seated || 1, t: Date.now() } }
+      await ref.update(on ? { [`state.${code}`]: { n: String(info && info.name || 'Host').slice(0, 14), s: info && info.seated || 1, f: info && info.free || 0, g: info && info.live ? 1 : 0, t: Date.now() } }
                           : { [`state.${code}`]: firebase.firestore.FieldValue.delete() });
     } catch (e) { console.warn('[online] open list', e); }
   }
@@ -4449,8 +4473,24 @@ const Online = (() => {
       const st = (d.exists && d.data().state) || {};
       const now = Date.now();
       return Object.entries(st).filter(([c, v]) => v && now - v.t < 10 * 60e3 && c !== room)
-        .map(([code, v]) => ({ code, name: v.n, seated: v.s })).sort((a, b) => b.seated - a.seated).slice(0, 12);
+        .map(([code, v]) => ({ code, name: v.n, seated: v.s, free: v.f || 0, live: !!v.g })).sort((a, b) => b.seated - a.seated).slice(0, 12);
     } catch (e) { return []; }
+  }
+
+  // The host's table plan before the start: n players, c of them the computer, d difficulty,
+  // t turn limit. It rides on the host's seat entry — the rules allow no other field — and is
+  // written in a transaction so a friend joining at the same moment is never dropped.
+  const DEFAULT_PLAN = { n: 4, c: 0, d: 'medium', t: 0 };
+  const plan = () => ({ ...DEFAULT_PLAN, ...((seats.find(x => x.plan) || {}).plan || {}) });
+  async function setPlan(next) {
+    if (!DB || !room || !host) return;
+    const ref = DB.collection(COLL).doc(room);
+    try {
+      await DB.runTransaction(async tx => {
+        const d = await tx.get(ref); const list = (d.data() && d.data().seats) || [];
+        tx.update(ref, { seats: list.map(x => x.clientId === CLIENT_ID ? { ...x, plan: { ...DEFAULT_PLAN, ...(x.plan || {}), ...next } } : x) });
+      });
+    } catch (e) { console.warn('[online] plan', e); }
   }
 
   function leave() {
@@ -4479,6 +4519,7 @@ const Online = (() => {
       try { await DB.collection(COLL).doc(room).update({ seats: seats.map(x => x.clientId === CLIENT_ID ? { ...x, pt: pushToken } : x) }); } catch (e) {}
     },
     isOpen: () => isOpen,
+    plan, setPlan,
     setTurnLimit: sec => { turnLimit = Math.max(0, sec | 0); },
     turnLimit: () => turnLimit,
     // seconds left on the current turn, or null when the room has no limit
@@ -5518,7 +5559,7 @@ function renderSheet() {
     body.innerHTML = `<div class="sheet-head"><h2>The realm · round ${game.round}</h2><button class="btn" data-act="sheet-close">Close</button></div><div class="lb">
       <span></span><span></span><span class="h">Gold</span><span class="h">Population</span><span class="h">Income</span><span class="h">Walls</span>
       ${(() => { const lead = leaderOf(); const you = yourSeat(); return game.players.slice().sort((a, b) => (a.id === lead.id ? -1 : b.id === lead.id ? 1 : 0)).map(q => { const pr = E.progress(game, q.id); const c = col(q.id); const wc = pr.keep <= 2 ? 'var(--rose)' : c; const tag = q.id === lead.id ? ' · leader' : (you && q.id === you.id ? ' · you' : ''); return `
-        <svg style="color:${c}" aria-hidden="true"><use href="#${crestOf(q.id)}"/></svg><span class="n${q.id === lead.id ? ' row-active' : ''}">${esc(dn(q))}${tag}</span><span class="g">${vis ? vis.gold[q.id] : q.gold}</span>
+        <svg style="color:${c}" aria-hidden="true"><use href="#${crestOf(q.id)}"/></svg><span class="n${q.id === lead.id ? ' row-active' : ''}">${esc(dn(q))}${nick(q) ? ` <span class="hint">· ${esc(nick(q))}</span>` : ''}${tag}</span><span class="g">${vis ? vis.gold[q.id] : q.gold}</span>
         <span class="m" aria-label="population ${pr.pop} of ${pr.popMax}"><i style="--v:${(100 * pr.pop / pr.popMax).toFixed(0)}%;--c:${c}"></i><b>${pr.pop}/${pr.popMax}</b></span>
         <span class="m" aria-label="income ${pr.income} of ${pr.incomeMax}"><i style="--v:${(100 * pr.income / pr.incomeMax).toFixed(0)}%;--c:${c}"></i><b>${pr.income}/${pr.incomeMax}</b></span>
         <span class="m" aria-label="walls ${pr.keep} of ${pr.keepMax}"><i style="--v:${(100 * pr.keep / pr.keepMax).toFixed(0)}%;--c:${wc}"></i><b>${pr.keep}/${pr.keepMax}</b></span>`; }).join(''); })()}
@@ -5982,7 +6023,7 @@ async function showVictory() {
   const youP = yourSeat();
   const youWon = !!youP && w.id === youP.id;
   const banner = (ui.humans > 1 || (online() && !youP))
-    ? `<div class="vbanner win">${esc(dn(w))} wins</div>`
+    ? `<div class="vbanner win">${esc(whoIs(w).replace(/,$/, ''))} wins</div>`
     : `<div class="vbanner ${youWon ? 'win' : 'lose'}">${youWon ? 'You win' : 'You lose'}</div>`;
   ui.wonGame = youWon && ui.humans === 1;
   ui.shareLine = ui.wonGame ? `I just won a game of Nobles as the ${dn(w)}, by ${String(v.cond).toLowerCase()} in round ${game.round}.` : null;
@@ -6167,18 +6208,15 @@ document.addEventListener('click', async ev => {
       break; }
     case 'room-invite': { const c = ON && ON.code(); if (c) await shareText(`Join my game of Nobles — room code ${c}.`, `${SITE_URL}?join=${c}`); break; }
     case 'room-open': if (ON && ON.isHost()) { await ON.setOpen(!ON.isOpen(), openInfo()); renderLobby(); toast(ON.isOpen() ? 'Anyone can join from Open games' : 'Only people with the code can join'); } break;
-    case 'turn-limit': if (ON && ON.isHost()) { ON.setTurnLimit(+a1); renderLobby(); } break;
+    case 'turn-limit': if (ON && ON.isHost()) { ON.setTurnLimit(+a1); renderLobby(); ON.setPlan({ t: +a1 }); } break;
     case 'open-join': await roomJoin(a1); break;
     case 'open-refresh': await loadOpenGames(); break;
     case 'room-copy': { const c = ON && ON.code(); if (c) { try { await navigator.clipboard.writeText(c); toast('Code copied'); } catch (e) { toast(c); } } break; }
-    case 'room-start': {
-      if (!ON || !ON.isHost()) break;
-      const n = ON.seats().length;
-      setup.locked = n;
-      setup.count = Math.max(setup.count, Math.max(2, n));
-      for (let i = 0; i < 6; i++) setup.seats[i] = i >= n;
-      renderSetup(); showScreen('new');
-      break; }
+    case 'room-start': if (ON && ON.isHost()) lobbyStart(); break;
+    case 'lobby-count': if (ON && ON.isHost()) { const k = +a1, J = ON.seats().length; if (k >= Math.max(2, J)) await ON.setPlan({ n: k, c: Math.min(ON.plan().c, k - J) }); renderLobby(); } break;
+    case 'lobby-diff': if (ON && ON.isHost()) { await ON.setPlan({ d: a1 }); renderLobby(); } break;
+    case 'lobby-cpu': if (ON && ON.isHost()) { const T = lobbyTable(); const c = Math.max(0, Math.min(T.n - T.joined, T.cpu + (+a1))); await ON.setPlan({ c }); renderLobby(); } break;
+    case 'claim-watch': claimSince = 0; showScreen('play'); computeBounds(); fitHome(true); renderAll(); await afterCommand(); break;
     case 'continue': resumeGame(); break;
     case 'howto': renderHowto(); showScreen('howto'); break;
     case 'houses': renderHouses(); showScreen('houses'); break;
@@ -6285,12 +6323,48 @@ function seatName(i) { const s = ON ? ON.seats()[i] : null; return s ? s.name : 
 let lastStateAt = 0;       // when this browser last saw the board move, local or remote
 let aiAbort = false;       // a remote board landed while we were playing the computer's turns
 function pushOnline() { lastStateAt = Date.now(); if (DBG) console.log('[nobles] push?', online()); if (online() && game) { const st = E.serialize(game); game.version = st.version; ON.push(st); } }
-function myName() { return (lsGet('nobles-name') || '').slice(0, 14); }
+function myName() { return safeName(lsGet('nobles-name') || '') || ''; }
+// Player names are seen by strangers in open games, so offensive ones are refused when typed and
+// hidden ("Player") when shown. Matching runs on a squashed copy (lower case, look-alike digits
+// and symbols mapped back to letters, spaces and dots dropped) so "F u c k" and "sh1t" are caught.
+// Words that hide inside ordinary names (dick → Dickens, cock → Hancock, ass → Cassie) only count
+// as a whole word.
+const BAD_ANY = ['fuck','fck','cunt','cocksuck','nigg','nigga','faggot','bitch','whore','slut','retard','tranny','pussy','penis','vagina','porn','nazi','hitler','twat','jizz','dildo','molest','paedo','incest','bastard','motherf','kkk','cumslut','blowjob','handjob','asshole','arsehole','dumbass','jackass','wetback','beaner','raghead','towelhead'];
+const BAD_WORD = ['shit','shits','fag','fags','dick','dicks','cock','cocks','cum','ass','arse','tit','tits','titty','boob','boobs','rape','raped','rapist','kike','spic','chink','gook','coon','dyke','homo','pedo','heil','wank','hoe','hoes','sex','sexy','anal','anus','knob','prick','piss','niger'];
+const LEET = { '0': 'o', '1': 'i', '3': 'e', '4': 'a', '5': 's', '7': 't', '8': 'b', '9': 'g', '@': 'a', '\u0024': 's', '!': 'i', '|': 'i', '+': 't' };
+const once = w => w.replace(/(.)\1+/g, '$1');   // "fuuuck" → "fuck", "pussy" → "pusy"
+const BAD_ANY1 = BAD_ANY.map(once).filter(w => w.length >= 4), BAD_WORD1 = BAD_WORD.map(once);   // 'kkk' → 'k' would match every k
+const BAD_STEM = ['shit'];   // bullshit, shithead — but not Matsushita
+function isOffensive(n) {
+  const low = String(n || '').toLowerCase().replace(/[01345789@$!|+]/g, c => LEET[c] || c);
+  const squashed = low.replace(/[^a-z]/g, '');
+  if (BAD_ANY.some(w => squashed.includes(w)) || BAD_ANY1.some(w => once(squashed).includes(w))) return true;
+  const words = [...low.split(/[^a-z]+/).filter(Boolean), squashed];   // "s h i t" counts as one word
+  return words.some(w => BAD_WORD.includes(w) || BAD_WORD1.includes(once(w)) || BAD_STEM.some(b => w.startsWith(b) || w.endsWith(b)));
+}
+// Tidy a typed name: letters, digits, spaces and a little punctuation, 14 characters. Returns ''
+// for an empty or offensive name.
+function safeName(n) {
+  const t = String(n || '').normalize('NFKC').replace(/[^\p{L}\p{N} '._-]/gu, '').replace(/\s+/g, ' ').trim().slice(0, 14);
+  return t && !isOffensive(t) && !isOffensive(n) ? t : '';
+}
+// The name a human seat goes by online (null offline, for the computer, or for an unknown seat).
+function nick(q) {
+  if (!q || q.ai || !q.clientId || !online()) return null;
+  const s = ON.seats().find(x => x.clientId === q.clientId);
+  return s ? (safeName(s.name) || 'Player') : null;
+}
+// "The Architect, Kevin," when we know the player's name; "Architect" otherwise.
+const whoIs = q => { const n = nick(q); return n ? `The ${dn(q)}, ${n},` : dn(q); };
 function showWaiting() {
   ui.remoteTurn = true; ui.aiTurn = false; ui.busy = false;
   clearSel(); closeSheet(); renderAll();
   const c = $('caption');
-  c.innerHTML = `Waiting for <b>${esc(dn(me()))}</b>`;
+  const n = nick(me());
+  c.innerHTML = n ? `The <b>${esc(dn(me()))}</b>, ${esc(n)}, moves` : `Waiting for <b>${esc(dn(me()))}</b>`;
+  // another person's turn starts: name them once on the ribbon too
+  const st = `${game.round}:${game.turn}:${game.phase}`;
+  if (n && game.phase === 'act' && ui.waitStamp !== st) { ui.waitStamp = st; showRibbon(me(), `The ${dn(me())}, ${n}, moves`); }
   c.hidden = false;
 }
 // A board arrived from another player's browser. The whole game is replaced —
@@ -6316,7 +6390,7 @@ async function applyRemote(state) {
   }
   renderAll();
   if (fresh && yourSeat()) await showHouseCard(yourSeat());
-  else if (choosing) renderClaim();
+  else if (choosing) { if (yourSeat()) { await seatedNow(); return; } renderClaim(); }
   // The event modal fires inside the turn that ends a round, which happens in
   // one browser only. Everyone else sees the round tick over in the snapshot.
   else if (game.round > prevRound && game.currentEvent && game.eventAge === 0 && game.phase === 'act') showEvent(null);
@@ -6339,45 +6413,95 @@ async function loadOpenGames() {
   const list = await ON.listOpen();
   box.innerHTML = list.length ? list.map(g => `<div class="seat">
       <div class="crest">${ico('ic-houses', '')}</div>
-      <div class="nm">${esc(g.name)}’s game<span class="hint"> · ${g.seated} ${g.seated === 1 ? 'player' : 'players'} waiting</span></div>
+      <div class="nm">${esc(safeName(g.name) || 'Player')}’s game<span class="hint"> · ${g.live ? `under way · ${g.free} computer seat${g.free === 1 ? '' : 's'} to take` : `${g.seated} ${g.seated === 1 ? 'player' : 'players'} waiting`}</span></div>
       <div class="toggle"><button data-act="open-join:${esc(g.code)}">Join</button></div></div>`).join('')
     : '<p class="hint">No open games right now. Start one and turn on “Let anyone join”.</p>';
 }
 const TURN_LIMITS = [[0, 'None'], [180, '3 min'], [600, '10 min'], [1800, '30 min'], [3600, '1 hr'], [43200, '12 hr'], [86400, '24 hr']];
-function openInfo() { const seats = ON.seats(); return { name: (seats[0] && seats[0].name) || myName(), seated: seats.length }; }
+function openInfo() {
+  const seats = ON.seats(), name = (seats[0] && safeName(seats[0].name)) || myName() || 'Host';
+  if (game && online()) { const free = game.players.filter(p => p.ai && !p.eliminated).length; return { name, seated: game.players.filter(p => !p.ai).length, free, live: true }; }
+  return { name, seated: seats.length };
+}
+// The lobby. Everyone sees the table: who has joined, which seats are still waiting for a
+// friend, and which the computer will play. The host sets the table (players, computer
+// strength, turn limit) and can hand a waiting seat to the computer to start without waiting.
+function lobbyTable() {
+  const seats = ON ? ON.seats() : [], pl = ON ? ON.plan() : { n: 4, c: 0, d: 'medium', t: 0 };
+  const joined = seats.length, n = Math.min(6, Math.max(2, pl.n, joined)), cpu = Math.max(0, Math.min(pl.c, n - joined));
+  return { seats, joined, n, cpu, waiting: n - joined - cpu, d: pl.d, t: pl.t };
+}
 function renderLobby() {
-  const seats = ON ? ON.seats() : [];
+  const T = lobbyTable(), hostNow = !!(ON && ON.isHost());
   $('lobby-code').textContent = ON && ON.code() ? ON.code() : '';
-  $('lobby-start').hidden = !(ON && ON.isHost());
-  const hostNow = !!(ON && ON.isHost());
+  $('lobby-start').hidden = !hostNow;
   $('lobby-hint').textContent = hostNow
-    ? 'Share the code with your friends and start when everyone’s in. The computer plays any empty seats.'
+    ? (T.waiting ? 'Share the code with friends. Start any time — the computer takes any seat still waiting.' : 'Everyone’s seated. Start when you’re ready.')
     : 'You’re in! The game starts when the host is ready.';
   $('lobby-host').hidden = !hostNow;
-  if (hostNow) {
-    const o = $('lobby-open'); o.setAttribute('aria-checked', String(ON.isOpen())); o.textContent = ON.isOpen() ? 'Open to anyone ✓' : 'Let anyone join';
-    $('lobby-limit').innerHTML = TURN_LIMITS.map(([sec, l]) => `<button role="radio" aria-checked="${ON.turnLimit() === sec}" data-act="turn-limit:${sec}">${l}</button>`).join('');
-  }
-  $('lobby-seats').innerHTML = seats.map((q, i) => `
-    <div class="seat">
+  const rows = [];
+  T.seats.forEach((q, i) => rows.push(`<div class="seat">
       <div class="crest seatno" aria-hidden="true">${i + 1}</div>
-      <div class="nm">${esc(q.name)}${q.clientId === ON.clientId ? ' · you' : ''}${i === 0 ? ' · host' : ''}</div>
-    </div>`).join('') || '<p class="hint">Nobody has joined yet.</p>';
+      <div class="nm">${esc(safeName(q.name) || 'Player')}<span class="hint">${q.clientId === ON.clientId ? ' · you' : ''}${i === 0 ? ' · host' : ''}</span></div></div>`));
+  for (let k = 0; k < T.waiting; k++) rows.push(`<div class="seat waiting">
+      <div class="crest seatno" aria-hidden="true">${rows.length + 1}</div>
+      <div class="nm"><span class="hint">Waiting for a player…</span></div>
+      ${hostNow ? '<div class="toggle"><button data-act="lobby-cpu:1">Use computer</button></div>' : ''}</div>`);
+  for (let k = 0; k < T.cpu; k++) rows.push(`<div class="seat cpu">
+      <div class="crest seatno" aria-hidden="true">${rows.length + 1}</div>
+      <div class="nm">Computer</div>
+      ${hostNow ? '<div class="toggle"><button data-act="lobby-cpu:-1">Save for a friend</button></div>' : ''}</div>`);
+  $('lobby-seats').innerHTML = rows.join('');
+  const dl = (DIFFS.find(d => d[0] === T.d) || DIFFS[2])[1], tl = (TURN_LIMITS.find(x => x[0] === T.t) || TURN_LIMITS[0])[1];
+  $('lobby-rules').textContent = `${T.n} players · ${dl} computer · ${T.t ? `${tl} per turn` : 'no turn limit'}${T.cpu || T.waiting ? ' · friends can join later and take a computer seat' : ''}`;
+  if (hostNow) {
+    $('lobby-count').innerHTML = [2, 3, 4, 5, 6].map(k => `<button role="radio" aria-checked="${k === T.n}" data-act="lobby-count:${k}"${k < Math.max(2, T.joined) ? ' disabled' : ''}>${k}</button>`).join('');
+    $('lobby-diff').innerHTML = DIFFS.filter(d => d[0] !== 'tutorial').map(([k, l]) => `<button role="radio" aria-checked="${k === T.d}" data-act="lobby-diff:${k}">${l}</button>`).join('');
+    $('lobby-limit').innerHTML = TURN_LIMITS.map(([sec, l]) => `<button role="radio" aria-checked="${ON.turnLimit() === sec}" data-act="turn-limit:${sec}">${l}</button>`).join('');
+    const o = $('lobby-open'); o.setAttribute('aria-checked', String(ON.isOpen())); o.textContent = ON.isOpen() ? 'Open to anyone ✓' : 'Let anyone join';
+  }
+}
+// Host: keep the plan consistent with who has joined (a friend arriving takes a waiting seat,
+// then a computer seat, then grows the table).
+function lobbyTidy() {
+  if (!ON || !ON.isHost() || ui.screen !== 'lobby') return;
+  const pl = ON.plan(), J = ON.seats().length;
+  let n = pl.n, c = pl.c;
+  if (J > n) n = Math.min(6, J);
+  if (J + c > n) c = Math.max(0, n - J);
+  if (n !== pl.n || c !== pl.c) ON.setPlan({ n, c });
+}
+function lobbyStart() {
+  const T = lobbyTable();
+  setup.count = T.n; setup.diff = T.d; setup.locked = 0;
+  for (let i = 0; i < 6; i++) setup.seats[i] = i >= T.joined;   // joined friends first, the rest the computer
+  if (T.waiting) toast('The computer takes the empty seats. Friends can still join and take one.');
+  startGame();
+  if (ON.isOpen() && !game.players.some(p => p.ai)) ON.setOpen(false);
+}
+// The typed name, tidied. null (with a toast) when it is not allowed.
+function nameFromField() {
+  const raw = ($('online-name').value || '').trim();
+  const name = safeName(raw);
+  if (raw && !name) { toast('Please choose a different name'); $('online-name').focus(); return null; }
+  lsSet('nobles-name', name); $('online-name').value = name;
+  return name;
 }
 async function roomCreate() {
-  const name = ($('online-name').value || '').trim().slice(0, 14) || 'Host';
-  lsSet('nobles-name', name);
-  try { await ON.create(name); } catch (e) { toast(e.message || 'Could not make a room'); return; }
+  const name = nameFromField(); if (name == null) return;
+  try { await ON.create(name || 'Host'); } catch (e) { toast(e.message || 'Could not make a room'); return; }
+  ON.setPlan({ n: 4, c: 0, d: setup.diff === 'tutorial' ? 'medium' : setup.diff, t: ON.turnLimit() });
   renderLobby(); showScreen('lobby');
 }
 async function roomJoin(code) {
-  const name = ($('online-name').value || '').trim().slice(0, 14) || 'Player';
-  lsSet('nobles-name', name);
+  const name = nameFromField(); if (name == null) return;
   let r;
-  try { r = await ON.join(code, name); } catch (e) { toast(e.message || 'Could not join'); return; }
+  try { r = await ON.join(code, name || 'Player'); } catch (e) { toast(e.message || 'Could not join'); return; }
   if (r.started && r.state) {
+    // A newcomer waits on the joining screen (not the board) until the host seats them.
+    if (!(r.state.players || []).some(p => p.clientId === ON.clientId)) { claimSince = Date.now(); showScreen('claim'); }
     await applyRemote(r.state);                 // watch the live board either way
-    if (!r.seated) { renderClaim(); showScreen('claim'); }
+    if (!yourSeat()) { claimSince = Date.now(); renderClaim(); showScreen('claim'); }
     return;
   }
   renderLobby(); showScreen('lobby');
@@ -6387,19 +6511,48 @@ function roomLeave() {
   game = null; ui.remoteTurn = false;
   showScreen('online'); renderOnline();
 }
-// Seats a newcomer may take: anyone who left, or a seat the computer is holding.
+// Joining a game under way: the host's browser hands the newcomer one of the computer's seats
+// at random (assignJoiners). Until then they wait here; if every seat is held by a person
+// they can watch.
+let claimSince = 0;
 function renderClaim() {
-  const ps = game ? game.players.filter(p => !p.eliminated) : [];
-  $('claim-seats').innerHTML = ps.map(p => {
-    const mine = ON.isMine(p);
-    const held = p.ai ? 'played by the computer' : mine ? 'yours' : 'held by a player';
-    const pr = E.progress(game, p.id);
-    return `<div class="seat">
-      <div class="crest" style="color:${col(p.id)}">${ico(crestOf(p.id), '')}</div>
-      <div class="nm">${esc(dn(p))}<span class="hint"> · ${held} · ${pr.pop}/${pr.popMax} population</span></div>
-      <div class="toggle"><button data-act="claim:${p.id}"${mine ? ' disabled' : ''}>${mine ? 'Yours' : 'Take'}</button></div>
-    </div>`;
-  }).join('') || '<p class="hint">No seats to take.</p>';
+  if (!claimSince) claimSince = Date.now();
+  const free = game ? game.players.filter(p => p.ai && !p.eliminated).length : 0;
+  $('claim-hint').textContent = free
+    ? 'This game is under way. The host is giving you one of the computer’s seats…'
+    : 'Every seat in this game is held by a player, so there is no seat to take. You can watch.';
+  $('claim-watch').hidden = !!free;
+}
+// Host (or, if the host has gone quiet for 20 seconds, the newcomer): seat every friend who has
+// joined but holds no house yet, on a random computer seat. Never the seat whose turn it is and
+// never while the computer is mid-move, so nobody's turn changes hands under them.
+function assignJoiners() {
+  if (!online() || !game || game.phase === 'over' || ui.busy || ui.aiTurn) return;
+  const pending = ON.seats().filter(s => !game.players.some(p => p.clientId === s.clientId));
+  if (!pending.length) return;
+  const mine = pending.find(s => s.clientId === ON.clientId);
+  if (!ON.isHost() && !(mine && ui.screen === 'claim' && Date.now() - claimSince > 20000 && Date.now() - lastStateAt > 20000)) return;
+  const todo = ON.isHost() ? pending : [mine];
+  let seated = 0;
+  for (const s of todo) {
+    const open = game.players.filter(p => p.ai && !p.eliminated && p.id !== game.turn);
+    if (!open.length) break;
+    const p = open[Math.floor(Math.random() * open.length)];
+    p.ai = false; p.clientId = s.clientId; seated++;
+    if (s.clientId !== ON.clientId) toast(`${safeName(s.name) || 'A player'} joined as the ${dn(p)}`);
+  }
+  if (!seated) return;
+  pushOnline(); vis = snapshot(); renderAll();
+  if (ON.isOpen()) ON.setOpen(game.players.some(p => p.ai && !p.eliminated), openInfo());
+  if (ui.screen === 'claim' && yourSeat()) seatedNow();
+}
+// We were waiting on the joining screen and now hold a house: onto the board.
+async function seatedNow() {
+  claimSince = 0;
+  ui.humans = 1; ui.tipsOn = false; ui.turnStamp = null; ui.lastHuman = null; bounds = null; ui.staticDirty = true;
+  showScreen('play'); computeBounds(); fitHome(true); renderAll();
+  await showHouseCard(yourSeat());
+  await afterCommand();
 }
 // The computer's seats are played by the host. If the host goes quiet — closed the
 // tab, lost the connection — the waiting players take over in turn order, one at a
@@ -6453,9 +6606,13 @@ function askForPush() {
 function wireOnline() {
   if (!ON) return;
   ON.on('state', st => { applyRemote(st); });
-  ON.on('seats', (seats, started) => { if (ui.screen === 'lobby') { renderLobby(); if (ON.isHost() && ON.isOpen() && !started) ON.setOpen(true, openInfo()); } });
+  ON.on('seats', (seats, started) => {
+    if (ui.screen === 'lobby') { lobbyTidy(); renderLobby(); if (ON.isHost() && ON.isOpen() && !started) ON.setOpen(true, openInfo()); }
+    if (started) assignJoiners();
+  });
   // an open room re-lists itself every few minutes so the list only shows hosts who are still there
-  setInterval(() => { if (ui.screen === 'lobby' && ON.isHost() && ON.isOpen()) ON.setOpen(true, openInfo()); }, 4 * 60e3);
+  setInterval(() => { if (ON.isHost() && ON.isOpen() && (ui.screen === 'lobby' || (game && online()))) ON.setOpen(true, openInfo()); }, 4 * 60e3);
+  setInterval(assignJoiners, 2000);
   setInterval(turnClock, 1000);
   ON.on('error', msg => toast(msg));
   setInterval(aiWatchdog, 4000);
