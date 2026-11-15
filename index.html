@@ -226,7 +226,6 @@ button:focus-visible, [role=button]:focus-visible { outline: 3px solid var(--ter
 @container (min-width: 1000px) { .screen { --btn-h: 64px; } }
 @container (max-width: 700px) { .screen { --btn-h: 52px; } }
 /* Every description / helper line on every screen reads the same. */
-#diff-hint b { font-family: var(--body); font-weight: 800; color: var(--ink); }
 .hint, .hint.big, #diff-hint, .sheet-hint, .page .hint { font-family: var(--body) !important; font-weight: 500 !important; font-size: calc(16px * var(--ts)) !important; line-height: 1.45 !important; color: var(--ink-2) !important; letter-spacing: 0 !important; }
 .lg-combat { color: var(--rose); }
 .lg-turn { font-weight: 800; }
@@ -240,7 +239,6 @@ button:focus-visible, [role=button]:focus-visible { outline: 3px solid var(--ter
 .screen { display: none; }
 .screen.on { display: grid; }
 .play.screen.on { display: block; }
-.title.screen.on { display: grid; }
 
 /* ---------- generic page (New game, How to play, Houses) ---------- */
 .page { position: absolute; inset: 0; grid-template-rows: auto 1fr; background: var(--paper); }
@@ -256,8 +254,6 @@ button:focus-visible, [role=button]:focus-visible { outline: 3px solid var(--ter
 .label { margin: 6px 0 8px; }
 
 /* new game */
-.newgame { display: grid; grid-template-columns: 1fr 1.3fr; gap: 12px 24px; overflow: hidden; align-content: start; }
-.newgame .col { min-width: 0; display: flex; flex-direction: column; min-height: 0; }
 .seg { display: flex; gap: 8px; flex-wrap: wrap; }
 .seg button { min-width: var(--btn-h); height: var(--btn-h); padding: 0 18px; border-radius: var(--r-md); background: var(--paper); border: 1.5px solid var(--paper-edge); color: var(--ink); font-family: var(--body); font-weight: 700; font-size: var(--fs-ctl); display: flex; align-items: center; justify-content: center; box-shadow: var(--shadow-chip); }
 .seg button[aria-checked="true"] { background: var(--terracotta-2); color: var(--ivory); border-color: var(--terracotta-2); }
@@ -275,7 +271,7 @@ button:focus-visible, [role=button]:focus-visible { outline: 3px solid var(--ter
 .seat .toggle { display: flex; gap: 6px; }
 .seat .toggle button { width: auto; min-width: 88px; padding: 0 14px; white-space: nowrap; height: calc(var(--btn-h) - 8px); border-radius: var(--r-md); background: var(--paper); border: 1.5px solid var(--paper-edge); color: var(--ink); font-family: var(--body); font-weight: 700; font-size: var(--fs-help); }
 .seat .toggle button[aria-checked="true"] { background: var(--terracotta-2); color: var(--ivory); border-color: var(--terracotta-2); }
-@container (max-width: 700px) { .newgame { gap: 8px 14px; } .seat { gap: 8px; padding-left: 8px; } .seat .toggle button { min-width: 78px; padding: 0 10px; font-size: 15px; } #seg-count button { max-width: 48px; } .page-body { padding-top: 8px; padding-bottom: 8px; } .page-head { min-height: 60px; padding-top: 6px; padding-bottom: 6px; } }
+@container (max-width: 700px) { .seat { gap: 8px; padding-left: 8px; } .seat .toggle button { min-width: 78px; padding: 0 10px; font-size: 15px; } #seg-count button { max-width: 48px; } .page-body { padding-top: 8px; padding-bottom: 8px; } .page-head { min-height: 60px; padding-top: 6px; padding-bottom: 6px; } }
 /* strength slider: theme .slider visuals + a real range input on top for touch, keyboard and VoiceOver */
 .slider input[type=range] { position: absolute; left: 0; right: 0; top: 0; height: 72px; width: 100%; margin: 0; opacity: 0; cursor: pointer; -webkit-appearance: none; appearance: none; }
 .slider input[type=range]:focus-visible ~ .knob { outline: 3px solid var(--terracotta); outline-offset: 3px; }
@@ -283,7 +279,6 @@ button:focus-visible, [role=button]:focus-visible { outline: 3px solid var(--ter
 .slider .knob { pointer-events: none; }
 .slider .stops { pointer-events: none; }
 .slider .stops span { pointer-events: auto; cursor: pointer; padding: 16px; margin: -16px; }
-
 
 /* how to play + houses */
 .reader { max-width: 760px; margin: 0 auto; display: flex; flex-direction: column; gap: 12px; }
@@ -309,32 +304,6 @@ button:focus-visible, [role=button]:focus-visible { outline: 3px solid var(--ter
 .crest-strip { display: flex; gap: 14px; justify-content: center; margin-bottom: 4px; flex-wrap: wrap; }
 .crest-strip div { display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: var(--fs-lbl); color: var(--ink-2); font-family: var(--body); font-weight: 700; }
 .crest-strip svg { width: 32px; height: 32px; }
-
-/* ---------- title: the painting fills the screen; the menu sits on a vellum veil at the right ---------- */
-.title { position: absolute; inset: 0; background: var(--paper); }
-.title.screen.on { display: block; }
-.title .art { position: absolute; inset: 0; overflow: hidden; }
-.title .art svg { position: absolute; inset: 0; width: 100%; height: 100%; }
-.title .haze { position: absolute; inset: 0; pointer-events: none; background: linear-gradient(90deg, rgba(246,240,228,0) 38%, rgba(246,240,228,.55) 52%, rgba(246,240,228,.88) 64%, rgba(246,240,228,.95) 100%); }
-.title .menu { position: absolute; top: 0; bottom: 0; right: 0; width: min(48%, 460px); display: flex; flex-direction: column; justify-content: center; gap: 22px; padding: 16px calc(30px + var(--sar)) 16px 22px; }
-.title .masthead { text-align: center; }
-.title h1 { font-family: Cinzel, var(--display); font-weight: 700; font-size: calc(56px * var(--ts)); letter-spacing: .16em; text-indent: .16em; text-transform: uppercase; margin: 0; color: var(--ink); line-height: 1; text-shadow: 0 1px 0 rgba(255,250,240,.8); }
-.title .orn { display: flex; align-items: center; justify-content: center; gap: 10px; margin: 12px 0 10px; }
-.title .orn i { width: 70px; height: 1.5px; background: var(--gold-dark); opacity: .7; }
-.title .orn b { width: 8px; height: 8px; background: var(--gold-dark); transform: rotate(45deg); opacity: .85; }
-.title .tag { font-family: var(--display); font-weight: 500; font-style: italic; font-size: calc(21px * var(--ts)); color: var(--ink-2); margin: 0; line-height: 1.3; }
-.title .actions { display: flex; flex-direction: column; gap: 10px; }
-.title .primary { min-height: var(--btn-h); border-radius: var(--r-pill); font-family: Cinzel, var(--display); font-weight: 700; font-size: calc(17px * var(--ts)); letter-spacing: .14em; text-indent: .14em; text-transform: uppercase; }
-.title .btn { min-height: calc(var(--btn-h) - 8px); border-radius: var(--r-pill); font-family: Cinzel, var(--display); font-weight: 700; font-size: calc(13px * var(--ts)); letter-spacing: .08em; text-transform: uppercase; padding: 0 12px; gap: 8px; justify-content: center; white-space: nowrap; background: rgba(251,247,238,.92); }
-.title .btn .ico { width: 20px; height: 20px; flex: none; }
-.title .btn.cont { font-family: var(--body); font-weight: 700; font-size: var(--fs-help); letter-spacing: 0; text-transform: none; }
-.title .row3 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; } .title .row3 .online { grid-column: 1 / -1; }
-.title .fl { position: absolute; width: 120px; height: 120px; color: var(--gold-dark); opacity: .4; pointer-events: none; }
-.title .fl.tr { right: 8px; top: 8px; transform: rotate(90deg); } .title .fl.br { right: 8px; bottom: 8px; transform: rotate(180deg); }
-@container (min-width: 1000px) { .title .menu { width: min(46%, 540px); gap: 28px; } .title h1 { font-size: calc(72px * var(--ts)); } .title .tag { font-size: calc(25px * var(--ts)); } .title .primary { font-size: calc(20px * var(--ts)); } .title .btn { font-size: calc(15px * var(--ts)); min-height: var(--btn-h); } .title .btn.cont { font-size: var(--fs-ctl); } }
-@container (max-height: 420px) { .title .menu { gap: 14px; } .title h1 { font-size: calc(44px * var(--ts)); } .title .orn { margin: 8px 0 6px; } .title .tag { font-size: calc(18px * var(--ts)); } .title .btn { min-height: 44px; } .title .primary { min-height: 50px; } }
-@container (max-height: 360px) { .title .tag { display: none; } .title .orn { display: none; } }
-@container (max-width: 700px) { .title .btn { font-size: calc(12px * var(--ts)); letter-spacing: .05em; padding: 0 8px; } .title .btn .ico { display: none; } }
 
 /* ---------- play: the painted map ---------- */
 .play { position: absolute; inset: 0; overflow: hidden; background: var(--map); }
@@ -394,6 +363,18 @@ button:focus-visible, [role=button]:focus-visible { outline: 3px solid var(--ter
 
 @container (max-width: 700px) { .race { width: max-content; min-width: 120px; padding: 5px 7px; } .race .r .v { font-size: 12px; } .race .lbl { display: none; } }
 .crest-disc:active { transform: scale(.94); }
+/* Whose turn: a banner under the crests in any game with more than one person. Yours is solid in your
+   house colour and breathes; someone else's is parchment edged in theirs. */
+.turnflag { left: 50%; top: calc(var(--chip-h) + 18px); transform: translateX(-50%); display: flex; align-items: center; gap: 10px; max-width: min(560px, calc(100% - 2 * var(--chip-h) - 48px)); padding: 8px 22px 8px 12px; border-radius: var(--r-pill); background: rgba(246,240,228,.96); border: 3px solid var(--tc); box-shadow: var(--shadow-chip); color: var(--ink); font-family: var(--display); font-weight: 700; font-size: calc(19px * var(--ts)); line-height: 1.15; letter-spacing: .03em; white-space: nowrap; pointer-events: none; }
+.turnflag svg { flex: none; width: calc(30px * var(--ts)); height: calc(30px * var(--ts)); color: var(--tc); }
+.turnflag .t { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.turnflag .w { font-family: var(--body); font-weight: 600; font-size: .78em; color: var(--ink-2); letter-spacing: 0; }
+.turnflag.mine { background: var(--tc); border-color: rgba(255,255,255,.75); color: var(--ivory); text-shadow: 0 1px 0 rgba(0,0,0,.35); font-size: calc(23px * var(--ts)); letter-spacing: .08em; text-transform: uppercase; animation: turnGlow 2.4s var(--ease-out) infinite; }
+.turnflag.mine svg { color: var(--ivory); }
+@keyframes turnGlow { 0%, 100% { box-shadow: var(--shadow-chip), 0 0 0 0 color-mix(in srgb, var(--tc) 55%, transparent); } 50% { box-shadow: var(--shadow-chip), 0 0 0 10px color-mix(in srgb, var(--tc) 0%, transparent); } }
+.frame.rm .turnflag.mine { animation: none; }
+.frame.has-turnflag .toast { top: calc(var(--chip-h) * 2 + 34px); }
+.crests .crest-disc.active { transform: scale(1.12); box-shadow: 0 0 0 4px color-mix(in srgb, currentColor 35%, transparent), var(--shadow-chip); }
 .toast { top: calc(var(--chip-h) + 24px); max-width: 72%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; pointer-events: none; }
 .caption { left: 50%; bottom: calc(8px + var(--sab) + 8px); max-width: calc(100% - var(--end) * 2 - var(--sal) - var(--sar) - 40px); white-space: normal; text-align: center; line-height: 1.25; transform: translateX(-50%); padding: 10px 20px; border-radius: var(--r-pill); background: rgba(246,240,228,.94); border: 1.5px solid var(--paper-edge); box-shadow: var(--shadow-chip); font-size: calc(18px * var(--ts)); font-weight: 700; color: var(--ink); pointer-events: none; }
 .caption .ico { width: 24px; height: 24px; color: var(--umber); vertical-align: -6px; margin: 0 2px; }
@@ -429,6 +410,10 @@ button:focus-visible, [role=button]:focus-visible { outline: 3px solid var(--ter
 .ribbon { position: absolute; left: 50%; top: 22%; transform: translateX(-50%); width: min(440px, 70%); height: 88px; z-index: 8; display: grid; place-items: center; pointer-events: none; color: var(--rc, var(--terracotta)); animation: ribbonIn 900ms var(--ease-out) forwards; }
 .ribbon .rb { position: absolute; inset: 0; width: 100%; height: 100%; }
 .ribbon .cr { position: absolute; left: 48px; top: 50%; width: 34px; height: 34px; transform: translateY(-50%); color: var(--ivory); }
+/* The ribbon grows to fit its words (online names make it long) instead of letting them spill over the crest. */
+.ribbon { width: max-content; min-width: min(440px, 70%); max-width: 92%; padding: 0 64px 0 96px; box-sizing: border-box; }
+.ribbon span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.ribbon.long span { font-size: calc(19px * var(--ts)); letter-spacing: .03em; padding-left: 0; }
 .ribbon span { position: relative; font-family: var(--display); font-weight: 700; font-size: calc(24px * var(--ts)); letter-spacing: .06em; color: var(--ivory); text-shadow: 0 1px 0 rgba(0,0,0,.35); padding-left: 24px; }
 @keyframes ribbonIn { 0% { transform: translate(-50%, -30px) scale(.9); opacity: 0; } 18% { transform: translate(-50%, 0) scale(1); opacity: 1; } 80% { opacity: 1; } 100% { opacity: 0; } }
 
@@ -594,25 +579,6 @@ button:focus-visible, [role=button]:focus-visible { outline: 3px solid var(--ter
 .crests .crest-disc.done svg { opacity: .35; }
 .crests .crest-disc.done { background: var(--paper-2, var(--paper)); }
 
-/* Web build only: the link to the classic page, which still has online multiplayer.
-   The app build leaves the marker empty, so this rule matches nothing there. */
-.title a.btn.online { width: 100%; margin-top: 10px; text-decoration: none; color: inherit; }
-
-/* ---------- online play (web build only) ---------- */
-.online-body { display: flex; flex-direction: column; gap: 12px; max-width: 520px; margin: 0 auto; width: 100%; }
-.online-body .col { display: flex; flex-direction: column; gap: 6px; }
-.online-body a.btn { text-decoration: none; color: inherit; }
-.field { height: var(--btn-h); border-radius: var(--r-md); border: 1.5px solid var(--paper-edge); background: var(--paper); color: var(--ink);
-  font-family: var(--body); font-size: var(--fs-body); font-weight: 600; padding: 0 14px; width: 100%; box-sizing: border-box; }
-.field:focus { outline: 2px solid var(--terracotta-2); outline-offset: 1px; }
-.field.code { font-family: var(--display); font-size: calc(22px * var(--ts)); letter-spacing: .18em; text-transform: uppercase; text-align: center; }
-.joinrow { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
-.roomcode { display: block; width: 100%; font-family: var(--display); font-weight: 700; font-size: calc(40px * var(--ts)); letter-spacing: .22em;
-  text-align: center; padding: 14px 0; border-radius: var(--r-md); border: 1.5px solid var(--paper-edge); background: var(--paper); color: var(--ink); box-shadow: var(--shadow-chip); }
-.roomcode:active { transform: scale(.99); }
-#lobby-seats { gap: 8px; }
-#s-lobby .page-body { max-width: 520px; margin: 0 auto; width: 100%; }
-
 /* ---------- chrome in the same hand as the title: roman capitals on buttons and labels, a serif caption ---------- */
 .btn, .primary, .seg button, .seat .toggle button, .act .lbl, .build .lbl, .endturn .lbl, #hud-round .lbl, .card.event .catpill, .lbl-n, .label, .kv .k, .lb .h, .row-i .k, .card .k { font-family: Cinzel, var(--display) !important; font-weight: 700 !important; letter-spacing: .08em !important; text-transform: uppercase !important; }
 .btn, .seg button, .seat .toggle button { font-size: calc(14px * var(--ts)) !important; }
@@ -625,46 +591,7 @@ button:focus-visible, [role=button]:focus-visible { outline: 3px solid var(--ter
 .chip, .btn, .caption, .race { background: rgba(250,246,236,.94); }
 .endturn { box-shadow: 0 0 0 3px rgba(250,246,236,.85), 0 4px 0 var(--terracotta-2), 0 8px 14px rgba(169,80,47,.3); }
 
-/* ---------- Cinzel, the face of the NOBLES masthead, is the standard on the title and New game screens ---------- */
-.title .tag { font-family: Cinzel, var(--display); font-style: normal; font-weight: 700; font-size: calc(17px * var(--ts)); letter-spacing: .06em; line-height: 1.45; }
-.title .btn.cont { font-family: Cinzel, var(--display); font-size: calc(14px * var(--ts)); letter-spacing: .06em; }
 .page-head h2 { font-family: Cinzel, var(--display); font-weight: 700; text-transform: uppercase; letter-spacing: .12em; }
-#s-new .page-head .primary { font-family: Cinzel, var(--display); text-transform: uppercase; letter-spacing: .12em; border-radius: var(--r-pill); padding: 0 26px; }
-#s-new .page-head .btn.icon { border-radius: 50%; }
-#s-new .label { font-family: Cinzel, var(--display) !important; font-size: calc(14px * var(--ts)) !important; letter-spacing: .12em !important; text-transform: uppercase !important; color: var(--ink) !important; }
-#s-new #seg-count button, #s-new .seat .nm { font-family: Cinzel, var(--display); }
-#s-new .seat .toggle button { font-family: Cinzel, var(--display); font-size: calc(13px * var(--ts)); letter-spacing: .06em; text-transform: uppercase; }
-#s-new #diff-hint b { font-family: Cinzel, var(--display); letter-spacing: .04em; }
-
-/* ---------- New game: laid out like the title — the war-council painting fills the screen,
-   a vellum haze rises on the right, and the controls sit on the haze with no boxes ---------- */
-#s-new { background: var(--paper); }
-#s-new .council { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
-#s-new .council svg { position: absolute; inset: 0; width: 100%; height: 100%; }
-#s-new .council::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, rgba(246,240,228,0) 22%, rgba(246,240,228,.62) 34%, rgba(246,240,228,.84) 44%, rgba(246,240,228,.9) 100%); }
-#s-new .page-head, #s-new .page-body { position: relative; }
-#s-new .page-head { background: none; border: 0; padding-left: calc(30% + var(--sal)); min-height: 64px; }
-#s-new .page-head .btn.icon { position: absolute; left: calc(14px + var(--sal)); top: 12px; background: rgba(251,247,238,.9); }
-#s-new .page-head h2 { font-size: calc(26px * var(--ts)); }
-#s-new .page-head h2::after { content: ""; display: block; width: 120px; height: 1.5px; margin-top: 6px; background: linear-gradient(90deg, var(--gold-dark), transparent); opacity: .8; }
-#s-new .page-body { padding-left: calc(30% + var(--sal)); padding-top: 4px; }
-#s-new .newgame { grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); gap: 0 26px; align-content: start; align-items: start; height: 100%; }
-#s-new .newgame .col { background: none; border: 0; box-shadow: none; padding: 0; max-height: 100%; }
-#s-new .newgame .col + .col { border-left: 1.5px solid rgba(154,122,60,.35); padding-left: 22px; }
-/* player count: ink-ringed tokens rather than app buttons */
-#s-new #seg-count { gap: 6px; }
-#s-new #seg-count button { border-radius: 50%; width: 44px; height: 44px; flex: none; max-width: none; background: rgba(251,247,238,.7); border: 1.5px solid rgba(110,80,50,.55); box-shadow: none; font-size: calc(18px * var(--ts)); }
-#s-new #seg-count button[aria-checked="true"] { background: var(--terracotta-2); border-color: var(--terracotta-2); color: var(--ivory); box-shadow: 0 0 0 3px rgba(201,150,60,.35); }
-#s-new .slider .track { background: rgba(230,214,184,.8); }
-#s-new #diff-hint { margin-top: -4px; }
-/* seats: ruled lines in a ledger, not a stack of cards */
-#s-new .seats { gap: 0; padding-top: 0; }
-#s-new .seat { background: none; border: 0; border-bottom: 1px solid rgba(154,122,60,.35); border-radius: 0; box-shadow: none; padding: 4px 0; min-height: 48px; }
-#s-new .seat .toggle { gap: 0; border: 1.5px solid rgba(110,80,50,.5); border-radius: var(--r-pill); overflow: hidden; }
-#s-new .seat .toggle button { border: 0; border-radius: 0; background: transparent; height: 34px; min-width: 0; width: auto; padding: 0 12px; font-size: calc(12px * var(--ts)); letter-spacing: .05em; }
-#s-new .seat .toggle button[aria-checked="true"] { background: var(--terracotta-2); }
-#s-new .hint { color: var(--ink-2) !important; }
-@container (max-width: 700px) { #s-new .page-head, #s-new .page-body { padding-left: calc(26% + var(--sal)); } #s-new .seat .toggle button { padding: 0 9px; font-size: calc(11px * var(--ts)); } #s-new #seg-count button { width: 38px; height: 38px; } }
 
 /* ---------- Houses: each row shows the house's portrait ---------- */
 .house-row:has(.portrait) { grid-template-columns: 36px 56px 34px 1fr; }
@@ -678,17 +605,10 @@ button:focus-visible, [role=button]:focus-visible { outline: 3px solid var(--ter
 
 /* typing works on iPhone: WebKit will not let an input inherit user-select:none and still take text */
 input, textarea, [contenteditable] { -webkit-user-select: text; user-select: text; -webkit-touch-callout: default; touch-action: manipulation; }
-/* online: open games, the lobby's host controls, the turn clock */
-.openhead { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+/* small text buttons (Skip their turn) and the online turn clock */
 .btn.small { min-height: 34px; height: 34px; padding: 0 14px; font-size: calc(12px * var(--ts)); border-radius: var(--r-pill); }
-#s-lobby #lobby-share { width: 100%; margin: 6px 0 10px; border-radius: var(--r-pill); font-family: Cinzel, var(--display); letter-spacing: .1em; text-transform: uppercase; }
-#lobby-host { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; } #lobby-host[hidden] { display: none; }
-.opentoggle[aria-checked="true"] { background: var(--terracotta-2); color: var(--ivory); border-color: var(--terracotta-2); }
-#lobby-limit button[aria-checked="true"] { background: var(--terracotta-2); color: var(--ivory); border-color: var(--terracotta-2); }
 #hud-round .clock { margin-left: 8px; font-family: var(--body); font-weight: 800; font-size: var(--fs-num); color: var(--ink); font-variant-numeric: tabular-nums; }
 #hud-round .clock.low { color: var(--rose, #B23A2E); }
-/* tall screens (iPad): the haze stops below the controls so the map table shows */
-@container (min-height: 600px) { #s-new .council::after { -webkit-mask-image: linear-gradient(180deg, #000 0%, #000 50%, rgba(0,0,0,.25) 78%, rgba(0,0,0,.15) 100%); mask-image: linear-gradient(180deg, #000 0%, #000 50%, rgba(0,0,0,.25) 78%, rgba(0,0,0,.15) 100%); } }
 
 /* victory / defeat card with the house's painting down the left */
 .victory.hasart { display: flex; align-items: stretch; padding: 0; gap: 0; max-width: min(94%, 760px); width: 760px; max-height: 88%; overflow: hidden; }
@@ -707,160 +627,202 @@ input, textarea, [contenteditable] { -webkit-user-select: text; user-select: tex
 .crest.seatno { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; border: 1.5px solid rgba(110,80,50,.55); font-family: Cinzel, var(--display); font-weight: 700; font-size: 14px; color: var(--ink); background: rgba(251,247,238,.7); }
 /* houses page: the house's own crest, large, next to its portrait */
 .house-row .crest.hcrest { width: 40px; height: 40px; }
-/* New game on phone widths (most iPhones are 844–852 pt with the notch margins): the painting
-   keeps a narrower strip and the controls get the room they need */
-@container (max-width: 1000px) {
-  #s-new .council::after { background: linear-gradient(90deg, rgba(246,240,228,0) 6%, rgba(246,240,228,.66) 17%, rgba(246,240,228,.86) 26%, rgba(246,240,228,.92) 100%); }
-  #s-new .page-head, #s-new .page-body { padding-left: calc(14% + var(--sal)); }
-  #s-new .page-head { min-height: 54px; padding-top: 6px; padding-bottom: 2px; }
-  #s-new .page-head h2 { font-size: calc(22px * var(--ts)); }
-  #s-new .page-head .btn.icon { top: 8px; width: 44px; height: 44px; min-height: 44px; }
-  #s-new .page-head .primary { min-height: 46px; height: 46px; padding: 0 20px; }
-  #s-new .newgame { gap: 0 16px; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); }
-  #s-new .newgame .col + .col { padding-left: 14px; }
-  #s-new #seg-count { gap: 5px; flex-wrap: nowrap; }
-  #s-new #seg-count button { width: 36px; height: 36px; font-size: calc(15px * var(--ts)); }
-  #s-new .label { font-size: calc(12px * var(--ts)) !important; margin: 4px 0 6px; }
-  #s-new .slider { height: 60px; }
-  #s-new .seat { min-height: 42px; gap: 8px; padding: 2px 0; grid-template-columns: 28px minmax(0, 1fr); }
-  #s-new .seat .toggle { justify-self: start; }
-  #s-new .seat .toggle button { height: 30px; padding: 0 10px; font-size: calc(11px * var(--ts)); letter-spacing: .04em; }
-  #s-new .hint, #s-new #diff-hint { font-size: calc(14px * var(--ts)) !important; }
-}
-#lobby-limit { flex-wrap: wrap; gap: 6px; } #lobby-limit button { min-width: 0; padding: 0 12px; height: 40px; font-size: calc(13px * var(--ts)); }
-#s-new .seat { grid-template-columns: 28px minmax(0, 1fr); } #s-new .seat .toggle { justify-self: start; }
-@container (max-width: 760px) {
-  #s-new .page-head, #s-new .page-body { padding-left: calc(9% + var(--sal)); }
-  #s-new .page-body { padding-right: calc(10px + var(--sar)); }
-  #s-new .newgame { gap: 0 12px; }
-  #s-new .newgame .col + .col { padding-left: 10px; }
-  #s-new #seg-count button { width: 32px; height: 32px; font-size: 14px; }
-  #s-new .seat .toggle button { padding: 0 7px; font-size: 10px; letter-spacing: .02em; }
-  #s-new .seat { gap: 6px; grid-template-columns: 24px minmax(0, 1fr); }
-  #s-new .crest.seatno { width: 24px; height: 24px; font-size: 12px; }
-}
 
-/* ===== New game, round 3 (Kevin 2026-11-08): no haze — the painting shows everywhere except
-   inside two solid parchment boxes that hold larger controls ===== */
-#s-new .council::after { display: none; }
-#s-new .page-head { background: none; border: 0; }
-#s-new .page-head h2 { display: inline-block; flex: none; background: var(--paper); border: 1.5px solid var(--paper-edge); border-radius: var(--r-pill); padding: 6px 22px 7px; box-shadow: 0 6px 18px rgba(60,40,20,.28); }
-#s-new .page-head h2::after { display: none; }
-#s-new .page-head .spacer { display: block; flex: 1; }
-#s-new .page-head .btn.icon { background: var(--paper); box-shadow: 0 6px 18px rgba(60,40,20,.28); }
-#s-new .page-head .primary { box-shadow: 0 6px 18px rgba(60,40,20,.3); }
-#s-new .newgame { gap: 14px; align-items: start; }
-#s-new .newgame .col, #s-new .newgame .col + .col { background: var(--paper); border: 1.5px solid var(--paper-edge); border-radius: 18px; box-shadow: 0 10px 26px rgba(60,40,20,.32); padding: 12px 16px 14px; max-height: 100%; }
-#s-new .newgame .col + .col { border-left: 1.5px solid var(--paper-edge); }
-#s-new #seg-count { gap: 6px; }
-#s-new #seg-count button { width: 46px; height: 46px; font-size: calc(19px * var(--ts)); background: var(--paper-2); }
-#s-new .slider { height: 66px; }
-#s-new .seat { min-height: 48px; border-bottom-color: rgba(154,122,60,.3); }
-#s-new .seat:last-child { border-bottom: 0; }
-#s-new .crest.seatno { width: 32px; height: 32px; font-size: 15px; }
-#s-new .seat { grid-template-columns: 32px minmax(0, 1fr); gap: 10px; }
-#s-new .seat .toggle button { height: 38px; padding: 0 16px; font-size: calc(13px * var(--ts)); letter-spacing: .06em; }
-#s-new .label { font-size: calc(13px * var(--ts)) !important; }
-#s-new .hint, #s-new #diff-hint { font-size: calc(15px * var(--ts)) !important; }
-/* phones: the boxes take most of the width, the painting keeps a strip on the left */
-@container (max-width: 1000px) {
-  #s-new .page-head, #s-new .page-body { padding-left: calc(12% + var(--sal)); }
-  #s-new .page-body { padding-right: calc(12px + var(--sar)); padding-top: 2px; }
-  #s-new .page-head { min-height: 56px; }
-  #s-new .page-head h2 { font-size: calc(19px * var(--ts)); padding: 5px 18px 6px; }
-  #s-new .newgame { grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); gap: 10px; }
-  #s-new .newgame .col, #s-new .newgame .col + .col { padding: 10px 12px 12px; }
-  #s-new #seg-count { gap: 5px; }
-  #s-new #seg-count button { width: 42px; height: 42px; font-size: 17px; }
-  #s-new .seat { min-height: 44px; }
-  #s-new .seat .toggle button { height: 36px; padding: 0 13px; font-size: 12px; }
-  #s-new .label { font-size: 12px !important; margin: 2px 0 6px; }
-  #s-new .hint, #s-new #diff-hint { font-size: 14px !important; }
-}
-@container (max-width: 760px) {
-  #s-new .page-head, #s-new .page-body { padding-left: calc(6% + var(--sal)); }
-  #s-new #seg-count button { width: 36px; height: 36px; font-size: 15px; }
-  #s-new .seat .toggle button { height: 32px; padding: 0 8px; font-size: 10.5px; letter-spacing: .02em; }
-  #s-new .crest.seatno { width: 26px; height: 26px; font-size: 13px; }
-  #s-new .seat { grid-template-columns: 26px minmax(0, 1fr); gap: 6px; }
-}
-/* iPad: roomier boxes */
-@container (min-width: 1000px) and (min-height: 600px) {
-  #s-new .newgame .col, #s-new .newgame .col + .col { padding: 18px 22px 20px; }
-  #s-new #seg-count button { width: 54px; height: 54px; font-size: 21px; }
-  #s-new .seat { min-height: 58px; }
-  #s-new .seat .toggle button { height: 44px; padding: 0 20px; font-size: 15px; }
-}
-/* the title plate always starts clear of the back button */
-#s-new .page-head { padding-left: max(calc(12% + var(--sal)), calc(var(--sal) + 74px)) !important; }
-@container (max-width: 760px) { #s-new .page-head { padding-left: calc(var(--sal) + 70px) !important; } }
-/* iPad: the boxes start further left so the player tokens fit */
-@container (min-width: 1000px) and (min-height: 600px) { #s-new .page-body { padding-left: calc(20% + var(--sal)); } #s-new .page-head { padding-left: calc(20% + var(--sal)) !important; } #s-new .newgame { grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); } }
 /* house card: the "Your house" label carries that house's crest */
 .card.event .catpill .crest-ic { width: 24px; height: 24px; }
-/* New game boxes: slightly see-through parchment (Kevin 2026-11-08), a light blur keeps text crisp */
-#s-new .newgame .col, #s-new .newgame .col + .col { background: rgba(250,246,236,.82); -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px); }
-#s-new .page-head h2 { background: rgba(250,246,236,.86); -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px); }
-#s-new #seg-count button:not([aria-checked="true"]) { background: rgba(240,230,210,.7); }
-#s-new .crest.seatno { background: rgba(251,247,238,.6); }
 
-/* lobby seat plan: joined friends, seats waiting for a friend, seats the computer will play */
-#lobby-seats .seat.waiting { border-style: dashed; background: transparent; box-shadow: none; }
-#lobby-seats .seat.cpu .nm { opacity: .75; }
-#lobby-seats .seat .toggle button { white-space: nowrap; padding: 0 12px; }
-#lobby-rules { margin: 4px 0 10px; }
-#lobby-count, #lobby-diff { flex-wrap: wrap; gap: 6px; }
-#lobby-count button, #lobby-diff button { min-width: 0; padding: 0 12px; height: 40px; font-size: calc(13px * var(--ts)); }
-#lobby-count button[disabled] { opacity: .35; }
-#claim-watch { margin-top: 12px; }
-/* lobby: room code and Share side by side so the seats show without scrolling on a phone */
-#s-lobby .page-body { display: grid; grid-template-columns: 1fr 1fr; column-gap: 10px; align-content: start; }
-#s-lobby .page-body > * { grid-column: 1 / -1; }
-#s-lobby #lobby-code { grid-column: 1; grid-row: 1; margin: 0; font-size: calc(28px * var(--ts)); letter-spacing: .14em; padding: 8px 4px; }
-#s-lobby #lobby-share { grid-column: 2; grid-row: 1; margin: 0; height: auto; min-height: 52px; align-self: stretch; white-space: nowrap; }
-#s-lobby #lobby-hint { margin: 8px 0 2px; }
-#lobby-seats { overflow: visible; -webkit-mask-image: none; mask-image: none; padding-bottom: 2px; flex: none; min-height: auto; height: auto; }
-#s-lobby .page-body > .label { margin-top: 4px; }
 /* ---- online presence + taking back a seat (2026-11-11) ---- */
 .caption button { pointer-events: auto; margin-left: 10px; vertical-align: middle; min-height: 34px; padding: 0 14px; font-size: calc(14px * var(--ts)); }
 .crests .crest-disc.away svg.c { opacity: .45; filter: grayscale(.7); }
 .crests .crest-disc.away::before { content: "away"; position: absolute; left: 50%; top: -9px; transform: translateX(-50%); font: 700 9px/1 var(--display); letter-spacing: .06em; text-transform: uppercase; color: var(--umber); background: var(--paper); border: 1px solid rgba(107,74,51,.42); border-radius: 6px; padding: 2px 4px; }
-#claim-seats .seat .crest .ico { width: 28px; height: 28px; }
-#claim-seats .seat.match { box-shadow: 0 0 0 2px var(--gold-dark); }
+
+/* ===== Game menus (Kevin 2026-11-15: "more like a traditional video game screen") =====
+   Title, New game, Play online, the lobby and Joining. The painting fills the screen and a dark
+   shade falls across one side. Choices are plain words, not buttons: the selected row brightens and
+   gets a gold rule, and its note shows at the foot. Settings read "Name  ‹ value ›". */
+.mscreen { position: absolute; inset: 0; overflow: hidden; background: #140d08; color: #F4EAD6;
+  --m-ink: #F4EAD6; --m-dim: rgba(244,234,214,.62); --m-faint: rgba(244,234,214,.42); --m-gold: #D9B06A; --m-gold-hi: #F3D597; --m-rule: rgba(217,176,106,.32);
+  --m-padl: calc(var(--sal) + clamp(16px, 4vw, 64px)); --m-padr: calc(var(--sar) + clamp(16px, 4vw, 64px));
+  --m-item: calc(19px * var(--ts)); --m-row: 46px; }
+.mscreen.screen.on { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; }
+.mscreen > .art { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+.mscreen > .art svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.mscreen > .haze { position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(90deg, rgba(16,10,6,.94) 0%, rgba(16,10,6,.88) 44%, rgba(16,10,6,.62) 60%, rgba(16,10,6,.12) 80%, rgba(16,10,6,0) 92%),
+              linear-gradient(0deg, rgba(16,10,6,.7) 0%, rgba(16,10,6,0) 24%); }
+.mscreen > :not(.art):not(.haze):not(.getapp) { position: relative; }
+.mscreen > .getapp { position: absolute; }
+
+/* heading: roman capitals and a short gold rule, top left */
+.mhead { display: flex; align-items: flex-start; gap: 24px; padding: 18px var(--m-padr) 8px var(--m-padl); }
+.mhead h2 { margin: 0 0 0 16px; font: 700 calc(24px * var(--ts))/1 Cinzel, var(--display); letter-spacing: .22em; text-transform: uppercase; color: var(--m-ink); }
+.mhead h2::after { content: ""; display: block; width: 56px; height: 2px; margin-top: 10px; background: var(--m-gold); }
+
+.mbody { min-height: 0; padding: 4px var(--m-padr) 6px var(--m-padl); display: grid; grid-template-columns: minmax(0, 400px); align-content: start; }
+.mbody.two { grid-template-columns: minmax(0, 330px) minmax(0, 290px); column-gap: clamp(18px, 3.5vw, 48px); }
+@container (min-width: 1000px) { .mbody.two { grid-template-columns: minmax(0, 400px) minmax(0, 360px); } }
+.mlist { display: flex; flex-direction: column; min-height: 0; max-height: 100%; overflow-y: auto; touch-action: pan-y; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+.mlist::-webkit-scrollbar { display: none; }
+.mlabel { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex: none; padding: 8px 6px 8px 16px; border-bottom: 1px solid var(--m-rule);
+  font: 700 calc(11px * var(--ts))/1 Cinzel, var(--display); letter-spacing: .3em; text-transform: uppercase; color: var(--m-gold); }
+.mlink { border: 0; background: none; padding: 6px 0 6px 12px; margin: -6px 0; cursor: pointer; font: inherit; letter-spacing: .2em; text-transform: uppercase; color: var(--m-dim); }
+.mlink:hover, .mlink:focus-visible { color: var(--m-ink); outline: none; }
+.mnote { margin: 6px 16px 8px; font: italic 500 calc(16px * var(--ts))/1.35 var(--display); color: var(--m-dim); }
+.mnote:empty { display: none; }
+.mnote.warn { color: #F0B48A; }
+
+/* a menu item: just the words */
+.mi { position: relative; flex: none; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: baseline; column-gap: 14px; width: 100%;
+  min-height: var(--m-row); padding: 8px 14px 8px 16px; border: 0; border-radius: 0; background: transparent; box-shadow: none; text-align: left; text-decoration: none; cursor: pointer;
+  font: 700 var(--m-item)/1.15 Cinzel, var(--display); letter-spacing: .16em; text-transform: uppercase; color: var(--m-dim);
+  transition: color .16s ease, background-color .2s ease, padding-left .18s ease; -webkit-tap-highlight-color: transparent; }
+.mi[hidden] { display: none; }
+.mi .t { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.mi .s { grid-column: 1 / -1; margin-top: 3px; font: italic 500 calc(15px * var(--ts))/1.2 var(--display); letter-spacing: .01em; text-transform: none; color: var(--m-faint); }
+.mi .go { font: 700 calc(12px * var(--ts))/1 Cinzel, var(--display); letter-spacing: .2em; color: var(--m-gold); opacity: 0; transition: opacity .16s; }
+.mi .go b, .opt .go b { font: 400 calc(22px * var(--ts))/0 var(--display); margin-left: 4px; position: relative; top: 2px; }
+.mi.gold { color: var(--m-gold); }
+.mi.small { --m-item: calc(13px * var(--ts)); min-height: 40px; }
+.mi .crest { width: 22px; height: 22px; flex: none; }
+.mi::before, .opt::before { content: ""; position: absolute; left: 0; top: 7px; bottom: 7px; width: 2px; background: var(--m-gold); transform: scaleY(0); transition: transform .18s ease; }
+.mi.sel, .opt.sel { background: linear-gradient(90deg, rgba(217,176,106,.2) 0%, rgba(217,176,106,.07) 55%, rgba(217,176,106,0) 100%); }
+.mi.sel::before, .opt.sel::before { transform: scaleY(1); }
+.mi.sel { color: var(--m-ink); padding-left: 22px; }
+.mi.sel .t { text-shadow: 0 0 20px rgba(217,176,106,.45); }
+.mi.sel .s { color: var(--m-dim); }
+.mi.sel .go { opacity: 1; }
+.mi.gold.sel { color: var(--m-gold-hi); }
+.mi:focus-visible, .opt:focus-visible, .opt button:focus-visible { outline: none; }
+.mi:active .t { transform: translateX(2px); }
+.mi.game .go, .mi.seatback .go { opacity: .7; }
+.mi.match .s { color: var(--m-gold); }
+
+/* a setting: name on the left, ‹ value › on the right */
+.opt { position: relative; flex: none; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; column-gap: 10px;
+  min-height: var(--m-row); padding: 0 2px 0 16px; border-bottom: 1px solid rgba(244,234,214,.07); color: var(--m-dim); cursor: pointer;
+  transition: color .16s ease, background-color .2s ease; -webkit-tap-highlight-color: transparent; }
+.opt .k { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 700 calc(14px * var(--ts))/1.1 Cinzel, var(--display); letter-spacing: .16em; text-transform: uppercase; }
+.opt .k .no { display: inline-block; min-width: 2.4em; color: var(--m-gold); letter-spacing: .08em; }
+.opt .v { display: flex; align-items: center; }
+.opt .v b { min-width: 5.4em; text-align: center; white-space: nowrap; font: 600 calc(18px * var(--ts))/1 var(--display); letter-spacing: .02em; color: var(--m-ink); }
+.opt .v em { font: italic 500 calc(16px * var(--ts))/1 var(--display); color: var(--m-faint); padding-right: 12px; white-space: nowrap; }
+.opt .arr { width: 36px; height: 40px; flex: none; padding: 0; border: 0; background: none; cursor: pointer; font: 400 calc(30px * var(--ts))/1 var(--display); color: var(--m-gold); opacity: .35; transition: opacity .16s, transform .12s; }
+.opt.sel .arr { opacity: 1; }
+.opt .arr[aria-disabled="true"] { opacity: .1 !important; cursor: default; }
+.opt .arr:active { transform: scale(.85); }
+.opt.sel { color: var(--m-ink); }
+.opt.locked, .opt.static { cursor: default; }
+.opt.locked .arr { visibility: hidden; }
+.opt.static { color: var(--m-ink); }
+.opt.static .k { letter-spacing: .1em; }
+/* text entry rows (name, room code): an underline, no box */
+.opt.field { grid-template-columns: minmax(0, 1fr) auto auto; cursor: text; }
+.mfield { width: 9em; min-width: 0; height: 38px; padding: 0 4px; border: 0; border-bottom: 1.5px solid var(--m-rule); border-radius: 0; background: transparent; outline: none; box-shadow: none;
+  font: 600 calc(20px * var(--ts))/1 var(--display); color: var(--m-ink); caret-color: var(--m-gold); transition: border-color .16s; }
+.mfield::placeholder { color: var(--m-faint); font-style: italic; }
+.mfield:focus { border-bottom-color: var(--m-gold); }
+.mfield.code { width: 6.2em; text-align: center; font: 700 calc(19px * var(--ts))/1 Cinzel, var(--display); letter-spacing: .3em; text-transform: uppercase; }
+.mfield.code::placeholder { font-style: normal; letter-spacing: .1em; }
+.opt .go { height: 40px; padding: 0 8px 0 14px; border: 0; background: none; cursor: pointer; font: 700 calc(12px * var(--ts))/1 Cinzel, var(--display); letter-spacing: .2em; text-transform: uppercase; color: var(--m-gold); }
+.opt .go[disabled] { opacity: .3; cursor: default; }
+
+/* the foot: Back on the left, the selected row's note, key hints on a computer */
+.mfoot { display: flex; align-items: center; gap: 20px; min-height: 50px; padding: 4px var(--m-padr) calc(6px + var(--sab)) var(--m-padl); border-top: 1px solid rgba(244,234,214,.1); }
+.mback { flex: none; display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 14px 0 16px; border: 0; background: none; cursor: pointer;
+  font: 700 calc(13px * var(--ts))/1 Cinzel, var(--display); letter-spacing: .22em; text-transform: uppercase; color: var(--m-ink); }
+.mback b { font: 400 calc(28px * var(--ts))/0 var(--display); color: var(--m-gold); position: relative; top: -1px; }
+.mback:hover b, .mback:focus-visible b { transform: translateX(-3px); }
+.mback:focus-visible { outline: none; }
+.mdesc { flex: 1; min-width: 0; font: italic 500 calc(17px * var(--ts))/1.25 var(--display); color: var(--m-dim); overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.mfoot .keys { display: none; flex: none; white-space: nowrap; font: 600 12px/1 var(--body); color: var(--m-faint); }
+.mfoot kbd { display: inline-block; margin: 0 5px 0 12px; padding: 3px 6px; border: 1px solid rgba(244,234,214,.28); border-radius: 4px; font: 700 11px/1 var(--body); color: var(--m-dim); }
+@media (hover: hover) and (pointer: fine) {
+  .mfoot .keys { display: inline; }
+  .mi:hover:not(.sel) { color: var(--m-ink); }
+}
+
+/* the title: the castle painting on the left, the name and the menu on the shaded right */
+#s-title.screen.on { grid-template-rows: minmax(0, 1fr) auto; }
+#s-title > .haze { background: linear-gradient(270deg, rgba(16,10,6,.92) 0%, rgba(16,10,6,.8) 30%, rgba(16,10,6,.42) 50%, rgba(16,10,6,.06) 68%, rgba(16,10,6,0) 80%),
+                                linear-gradient(0deg, rgba(16,10,6,.6) 0%, rgba(16,10,6,0) 22%); }
+.mtitle { --m-col: min(44%, 500px); justify-self: end; align-self: center; width: var(--m-col); min-height: 0; padding: 8px var(--m-padr) 0 0; box-sizing: content-box; display: flex; flex-direction: column; gap: 22px; }
+.mtitle .logo { padding-left: 16px; }
+.mtitle h1 { margin: 0; font: 700 calc(58px * var(--ts))/1 Cinzel, var(--display); letter-spacing: .2em; text-transform: uppercase; color: var(--m-ink); text-shadow: 0 2px 30px rgba(0,0,0,.55); white-space: nowrap; }
+.mtitle .tag { display: flex; align-items: center; gap: 12px; margin: 14px 0 0; white-space: nowrap; font: 700 calc(11px * var(--ts))/1 Cinzel, var(--display); letter-spacing: .26em; text-transform: uppercase; color: var(--m-gold); }
+.mtitle .tag i { width: 5px; height: 5px; flex: none; background: currentColor; transform: rotate(45deg); }
+.mtitle .mlist { overflow: visible; }
+#s-title .mi { --m-item: calc(21px * var(--ts)); min-height: 50px; }
+#s-title .mfoot { border-top: 0; padding-left: calc(100% - min(44%, 500px) - var(--m-padr) + 16px); }
+#s-title .mfoot .keys { display: none; }
+/* web: the App Store link sits quietly bottom left */
+#s-title .getapp { background: rgba(16,10,6,.55); color: var(--m-ink); border: 1px solid rgba(244,234,214,.22); box-shadow: none; font-size: 11px; letter-spacing: .16em; text-transform: uppercase; }
+
+/* the lobby's room code, top right */
+.roomcode { margin-left: auto; display: flex; align-items: baseline; gap: 14px; padding: 2px 0 0; border: 0; background: none; cursor: pointer; color: var(--m-ink); }
+.roomcode:empty { display: none; }
+.roomcode span { font: 700 calc(11px * var(--ts))/1 Cinzel, var(--display); letter-spacing: .3em; text-transform: uppercase; color: var(--m-gold); }
+.roomcode b { font: 700 calc(30px * var(--ts))/1 Cinzel, var(--display); letter-spacing: .24em; text-shadow: 0 2px 20px rgba(0,0,0,.5); }
+.roomcode:active b { color: var(--m-gold-hi); }
+#lobby-host:empty { display: none; }
+#lobby-opts .mnote { margin-top: 2px; }
 #claim-seats:empty { display: none; }
 
-/* ===== Online pages (Kevin 2026-11-11): the painted herald's desk behind Play online, the lobby and
-   Joining, laid out like New game — painting fully visible, controls in one see-through parchment box ===== */
-.artpage { background: #6b5238; }
-.artpage .backdrop { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
-.artpage .backdrop svg { position: absolute; inset: 0; width: 100%; height: 100%; }
-.artpage .page-head, .artpage .page-body { position: relative; }
-.artpage .page-head { background: none; border: 0; }
-.artpage .page-head h2 { display: inline-block; flex: none; font-size: calc(19px * var(--ts)); background: rgba(250,246,236,.86); -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px); border: 1.5px solid var(--paper-edge); border-radius: var(--r-pill); padding: 5px 18px 6px; box-shadow: 0 6px 18px rgba(60,40,20,.28); }
-.artpage .page-head h2::after { display: none; }
-.artpage .page-head .btn.icon { background: var(--paper); border-radius: 50%; box-shadow: 0 6px 18px rgba(60,40,20,.28); }
-.artpage .page-head .primary { box-shadow: 0 6px 18px rgba(60,40,20,.3); }
-.artpage .page-body, #s-lobby.artpage .page-body, .artpage .online-body {
-  align-self: start; max-height: calc(100% - 10px - var(--sab)); width: min(560px, 56%); max-width: none;
-  margin: 0 calc(14px + var(--sar)) 0 auto; padding: 14px 18px 16px;
-  background: rgba(250,246,236,.86); -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px);
-  border: 1.5px solid var(--paper-edge); border-radius: 18px; box-shadow: 0 10px 26px rgba(60,40,20,.32);
-  -webkit-mask-image: none; mask-image: none;
-}
-.artpage .page-head { padding-left: calc(var(--sal) + 18px); }
-.artpage .label { font-family: Cinzel, var(--display) !important; letter-spacing: .12em !important; text-transform: uppercase !important; color: var(--ink) !important; }
-.artpage .field { background: rgba(255,252,245,.9); }
-@container (max-width: 760px) { .artpage .page-body, #s-lobby.artpage .page-body, .artpage .online-body { width: 64%; padding: 10px 12px 12px; } }
-@container (min-width: 1000px) and (min-height: 600px) { .artpage .page-body, #s-lobby.artpage .page-body, .artpage .online-body { width: min(620px, 52%); margin-right: calc(40px + var(--sar)); } }
-/* phones: keep the online box compact so the code row shows without scrolling */
+/* small phones and short screens */
 @container (max-height: 440px) {
-  .artpage .online-body { gap: 8px; }
-  .artpage .online-body > .hint:first-child { font-size: calc(14px * var(--ts)); line-height: 1.3; }
-  .artpage .online-body .field { min-height: 42px; height: 42px; }
-  .artpage .online-body > .primary { min-height: 46px; height: 46px; }
-  .artpage .online-body .joinrow .btn { min-height: 42px; height: 42px; }
+  .mscreen { --m-row: 42px; --m-item: calc(18px * var(--ts)); }
+  .mhead { padding-top: 12px; padding-bottom: 4px; }
+  .mhead h2 { font-size: calc(20px * var(--ts)); }
+  .mhead h2::after { margin-top: 8px; }
+  .mfoot { min-height: 44px; }
+  .mdesc { font-size: calc(16px * var(--ts)); -webkit-line-clamp: 1; }
+  .mtitle { gap: 14px; }
+  .mtitle h1 { font-size: calc(46px * var(--ts)); }
+  .mtitle .tag { margin-top: 10px; }
+  #s-title .mi { --m-item: calc(19px * var(--ts)); min-height: 44px; }
+  .mi .s { font-size: calc(14px * var(--ts)); margin-top: 1px; }
+  .roomcode b { font-size: calc(24px * var(--ts)); }
 }
-@container (max-height: 440px) { .artpage .online-body > .hint:first-child { display: none; } }
+@container (max-height: 390px) {
+  .mscreen { --m-row: 40px; }
+  .mhead { padding-top: 10px; }
+  .mhead h2 { font-size: calc(18px * var(--ts)); }
+  .mhead h2::after { margin-top: 7px; }
+  .roster .opt { min-height: 38px; }
+  .mlabel { padding-top: 6px; padding-bottom: 6px; }
+  .mtitle .tag { display: none; }
+  #s-title .mi { min-height: 42px; }
+}
+@container (max-width: 760px) {
+  .mbody.two { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: 18px; }
+  .opt .k { font-size: calc(12px * var(--ts)); letter-spacing: .12em; }
+  .opt .v b { min-width: 4.4em; font-size: calc(17px * var(--ts)); }
+  .opt .arr { width: 28px; }
+  .mfield { width: 6.5em; }
+  .mfield.code { width: 4.6em; letter-spacing: .2em; }
+  .mtitle { --m-col: 52%; width: 52%; }
+  #s-title .mfoot { padding-left: calc(48% - var(--m-padr) + 16px); }
+  .mtitle h1 { font-size: calc(40px * var(--ts)); }
+}
+
+/* the seat list sits over the brightest part of a painting: a smoked-glass panel keeps it readable */
+.mbody.two .roster { align-self: start; padding-bottom: 4px; background: linear-gradient(180deg, rgba(16,10,6,.66), rgba(16,10,6,.5)); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); box-shadow: inset 0 1px 0 rgba(217,176,106,.35); }
+.mbody.two .roster .opt:last-child { border-bottom: 0; }
+#s-title .mdesc { -webkit-line-clamp: 2 !important; }
+#s-lobby > .haze, #s-online > .haze { background: linear-gradient(90deg, rgba(16,10,6,.94) 0%, rgba(16,10,6,.88) 44%, rgba(16,10,6,.62) 60%, rgba(16,10,6,.12) 80%, rgba(16,10,6,0) 92%),
+  linear-gradient(0deg, rgba(16,10,6,.7) 0%, rgba(16,10,6,0) 24%), linear-gradient(180deg, rgba(16,10,6,.55) 0%, rgba(16,10,6,0) 22%); }
+@container (max-width: 760px) {
+  .mtitle { --m-col: 46%; width: 46%; }
+  #s-title .mfoot { padding-left: calc(54% - var(--m-padr) + 16px); }
+  .mtitle h1 { font-size: calc(36px * var(--ts)); }
+  #s-title > .haze { background: linear-gradient(270deg, rgba(16,10,6,.93) 0%, rgba(16,10,6,.86) 40%, rgba(16,10,6,.5) 56%, rgba(16,10,6,0) 72%), linear-gradient(0deg, rgba(16,10,6,.6) 0%, rgba(16,10,6,0) 22%); }
+}
+/* arriving on a menu: the words rise in, the title painting drifts slowly */
+@keyframes mIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@keyframes mDrift { from { transform: scale(1); } to { transform: scale(1.06) translate(-1%, -.5%); } }
+.mscreen.on .mhead, .mscreen.on .mbody, .mscreen.on .mtitle { animation: mIn .5s cubic-bezier(.2,.7,.2,1) both; }
+.mscreen.on .mbody { animation-delay: .06s; }
+#s-title.on > .art svg { animation: mDrift 40s ease-in-out infinite alternate; transform-origin: 30% 40%; }
+@media (prefers-reduced-motion: reduce) { .mscreen.on .mhead, .mscreen.on .mbody, .mscreen.on .mtitle, #s-title.on > .art svg { animation: none; } }
 
 </style>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -1455,56 +1417,42 @@ input, textarea, [contenteditable] { -webkit-user-select: text; user-select: tex
 <div class="frame" id="frame">
 
   <!-- ============ TITLE ============ -->
-  <section class="title screen" id="s-title">
+  <!-- Menus are game menus, not app pages: the painting fills the screen, a shade falls across one
+       side, and the choices are plain words. One row is always selected (hover, arrow keys or the last
+       row touched); its note shows at the foot of the screen. -->
+  <section class="title screen mscreen" id="s-title">
     <div class="art"><svg viewBox="0 0 150 100" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><use href="#art-hero-1"/></svg></div>
     <div class="haze" aria-hidden="true"></div>
     <a class="getapp" href="https://apps.apple.com/app/id6813272230" target="_blank" rel="noopener"><img src="/icon-192.png" alt="">Get the iPhone app</a>
-    <div class="menu">
-      <svg class="fl tr" aria-hidden="true"><use href="#map-border"/></svg><svg class="fl br" aria-hidden="true"><use href="#map-border"/></svg>
-      <div class="masthead">
+    <div class="mtitle">
+      <div class="logo">
         <h1>Nobles</h1>
-        <div class="orn" aria-hidden="true"><i></i><b></b><i></i></div>
-        <p class="tag">Every field a fief.<br>Every fief a fight.</p>
+        <p class="tag">Every field a fief <i aria-hidden="true"></i> Every fief a fight</p>
       </div>
-      <div class="actions">
-        <button class="primary" data-act="new" aria-label="New game">New game</button>
-        <button class="btn cont" id="btn-continue" data-act="continue" hidden><svg class="ico"><use href="#ic-endturn"/></svg><span id="continue-label">Continue</span></button>
-        <div class="row3">
-          <button class="btn" data-act="howto" aria-label="How to play"><svg class="ico"><use href="#ic-rules"/></svg>How to play</button>
-          <button class="btn" data-act="houses" aria-label="The six houses"><svg class="ico"><use href="#ic-houses"/></svg>Houses</button>
-          <button class="btn online" data-act="online" aria-label="Play online with friends"><svg class="ico"><use href="#ic-houses"/></svg>Play online</button>
-        </div>
-      </div>
+      <nav class="mlist" aria-label="Main menu">
+        <button class="mi" id="btn-continue" data-act="continue" hidden><span class="t" id="continue-label">Continue</span><span class="s" id="continue-sub"></span></button>
+        <button class="mi" data-act="new" data-desc="Play the computer, or pass one device between friends."><span class="t">New game</span></button>
+        <button class="mi" data-act="online" data-desc="Play with friends on their own phones or computers."><span class="t">Play online</span></button>
+        <button class="mi" data-act="howto" data-desc="Learn the rules of the realm."><span class="t">How to play</span></button>
+        <button class="mi" data-act="houses" data-desc="Each house has its own power."><span class="t">The houses</span></button>
+      </nav>
     </div>
+    <footer class="mfoot"><span class="mdesc" aria-live="polite"></span><span class="keys" aria-hidden="true"><kbd>↑↓</kbd> Choose <kbd>Enter</kbd> Select</span></footer>
   </section>
 
   <!-- ============ NEW GAME ============ -->
-  <section class="page screen" id="s-new">
-    <div class="council" aria-hidden="true"><svg viewBox="0 0 150 100" preserveAspectRatio="xMidYMid slice"><use href="#art-council-1"/></svg></div>
-    <header class="page-head">
-      <button class="btn icon" data-act="title" aria-label="Back"><svg class="ico"><use href="#ic-back"/></svg></button>
-      <h2>New game</h2>
-      <span class="spacer"></span>
-      <button class="primary" data-act="start" aria-label="Begin the game"><svg class="ico"><use href="#ic-endturn"/></svg>Begin</button>
-    </header>
-    <div class="page-body newgame">
-      <div class="col">
-        <div class="label">Players</div>
-        <div class="seg" id="seg-count" role="radiogroup" aria-label="Number of players"></div>
-        <div class="label" style="margin-top:14px">Computer strength</div>
-        <div class="slider" id="diff-slider" style="--f:.5">
-          <div class="track"></div><div class="fill"></div><div class="knob" aria-hidden="true"></div>
-          <div class="stops" id="diff-stops" aria-hidden="true"></div>
-          <input type="range" id="diff-range" min="0" max="4" step="1" value="2" aria-label="Computer strength" aria-valuetext="Medium">
-        </div>
-        <p class="hint big" id="diff-hint"></p>
-      </div>
-      <div class="col">
-        <div class="label">Seats</div>
-        <div class="seats" id="seats"></div>
-        <p class="hint">Houses and their perks are dealt at random.</p>
+  <section class="screen mscreen" id="s-new">
+    <div class="art" aria-hidden="true"><svg viewBox="0 0 150 100" preserveAspectRatio="xMidYMid slice"><use href="#art-council-1"/></svg></div>
+    <div class="haze" aria-hidden="true"></div>
+    <header class="mhead"><h2>New game</h2></header>
+    <div class="mbody two">
+      <div class="mlist" id="setup-opts" aria-label="Game settings"></div>
+      <div class="mlist roster">
+        <div class="mlabel">Seats</div>
+        <div id="seats"></div>
       </div>
     </div>
+    <footer class="mfoot"><button class="mback" data-act="title" data-back aria-label="Back"><b>‹</b> Back</button><span class="mdesc" data-def="Houses and their powers are dealt at random." aria-live="polite"></span><span class="keys" aria-hidden="true"><kbd>←→</kbd> Change <kbd>Esc</kbd> Back</span></footer>
   </section>
 
   <!-- ============ HOW TO PLAY ============ -->
@@ -1526,77 +1474,62 @@ input, textarea, [contenteditable] { -webkit-user-select: text; user-select: tex
   </section>
 
     <!-- ============ ONLINE (web build only) ============ -->
-  <section class="page screen artpage" id="s-online">
-    <div class="backdrop" aria-hidden="true"><svg viewBox="0 0 150 100" preserveAspectRatio="xMidYMid slice"><use href="#art-online-1"/></svg></div>
-    <header class="page-head">
-      <button class="btn icon" data-act="title" aria-label="Back"><svg class="ico"><use href="#ic-back"/></svg></button>
-      <h2>Play online</h2>
-    </header>
-    <div class="page-body scroll online-body">
-      <p class="hint">Start a game and share the code with friends, or join one below. The computer plays any empty seats.</p>
-      <div class="col">
-        <div class="label">Your name</div>
-        <input class="field" id="online-name" maxlength="14" autocomplete="nickname" placeholder="Name" aria-label="Your name">
+  <section class="screen mscreen" id="s-online">
+    <div class="art" aria-hidden="true"><svg viewBox="0 0 150 100" preserveAspectRatio="xMidYMid slice"><use href="#art-online-1"/></svg></div>
+    <div class="haze" aria-hidden="true"></div>
+    <header class="mhead"><h2>Play online</h2></header>
+    <div class="mbody two">
+      <div class="mlist">
+        <p class="mnote warn" id="online-note"></p>
+        <label class="opt field" data-row="name" data-desc="The name the other players see."><span class="k">Your name</span><input class="mfield" id="online-name" maxlength="14" autocomplete="nickname" placeholder="Name" aria-label="Your name"></label>
+        <button class="mi" data-act="room-create" data-desc="Open a room and share its code with friends. The computer plays any empty seats."><span class="t">Start a game</span></button>
+        <div class="opt field" data-row="code" data-desc="Type the code a friend sent you."><span class="k">Code</span><input class="mfield code" id="online-code" maxlength="8" autocapitalize="characters" spellcheck="false" placeholder="– – – –" aria-label="Room code"><button class="go" data-act="room-join" aria-label="Join that room">Join <b>›</b></button></div>
+        <button class="mi" id="btn-rejoin" data-act="room-rejoin" data-desc="Go back to the last room you were in." hidden><span class="t" id="rejoin-label">Rejoin</span></button>
+        <a class="mi small" href="classic.html" data-desc="The original online version. It has its own rooms."><span class="t">The classic version</span></a>
       </div>
-      <button class="primary" data-act="room-create" aria-label="Start a game">Start a game</button>
-      <div class="col">
-        <div class="label">Have a code?</div>
-        <div class="joinrow">
-          <input class="field code" id="online-code" maxlength="8" autocapitalize="characters" spellcheck="false" placeholder="CODE" aria-label="Room code">
-          <button class="btn" data-act="room-join" aria-label="Join that room">Join</button>
-        </div>
+      <div class="mlist roster">
+        <div class="mlabel">Open games <button class="mlink" data-act="open-refresh" aria-label="Refresh open games">Refresh</button></div>
+        <div id="open-games"></div>
       </div>
-      <button class="btn" id="btn-rejoin" data-act="room-rejoin" hidden></button>
-      <div class="col">
-        <div class="label openhead">Open games<button class="btn small" data-act="open-refresh" aria-label="Refresh open games">Refresh</button></div>
-        <div class="seats fits" id="open-games"></div>
-      </div>
-      <p class="hint" id="online-note"></p>
-      <a class="btn" href="classic.html">The classic version (its own rooms)</a>
     </div>
+    <footer class="mfoot"><button class="mback" data-act="title" data-back aria-label="Back"><b>‹</b> Back</button><span class="mdesc" aria-live="polite"></span><span class="keys" aria-hidden="true"><kbd>↑↓</kbd> Choose <kbd>Esc</kbd> Back</span></footer>
   </section>
 
   <!-- ============ LOBBY (web build only) ============ -->
-  <section class="page screen artpage" id="s-lobby">
-    <div class="backdrop" aria-hidden="true"><svg viewBox="0 0 150 100" preserveAspectRatio="xMidYMid slice"><use href="#art-online-1"/></svg></div>
-    <header class="page-head">
-      <button class="btn icon" data-act="room-leave" aria-label="Leave the room"><svg class="ico"><use href="#ic-back"/></svg></button>
-      <h2>Your game</h2>
-      <span class="spacer"></span>
-      <button class="primary" id="lobby-start" data-act="room-start" aria-label="Start the game"><svg class="ico"><use href="#ic-endturn"/></svg>Start</button>
-    </header>
-    <div class="page-body scroll">
-      <button class="roomcode" id="lobby-code" data-act="room-copy" aria-label="Room code, tap to copy"></button>
-      <p class="hint" id="lobby-hint"></p>
-      <button class="primary" id="lobby-share" data-act="room-invite" aria-label="Share the code"><svg class="ico"><use href="#ic-endturn"/></svg>Share code</button>
-      <div class="label">Seats</div>
-      <div class="seats fits" id="lobby-seats"></div>
-      <p class="hint" id="lobby-rules"></p>
-      <div class="hostonly" id="lobby-host">
-        <div class="label">Players</div>
-        <div class="seg" id="lobby-count" role="radiogroup" aria-label="Number of players"></div>
-        <div class="label">Computer strength</div>
-        <div class="seg" id="lobby-diff" role="radiogroup" aria-label="Computer strength"></div>
-        <div class="label">Time limit per turn</div>
-        <div class="seg" id="lobby-limit" role="radiogroup" aria-label="Time limit per turn"></div>
-        <button class="btn opentoggle" id="lobby-open" data-act="room-open" role="switch" aria-checked="false">Let anyone join</button>
+  <section class="screen mscreen" id="s-lobby">
+    <div class="art" aria-hidden="true"><svg viewBox="0 0 150 100" preserveAspectRatio="xMidYMid slice"><use href="#art-online-1"/></svg></div>
+    <div class="haze" aria-hidden="true"></div>
+    <header class="mhead"><h2>Your game</h2><button class="roomcode" id="lobby-code" data-act="room-copy" aria-label="Room code, tap to copy"></button></header>
+    <div class="mbody two">
+      <div class="mlist" id="lobby-opts">
+        <button class="mi gold" id="lobby-start" data-act="room-start"><span class="t">Start the game</span></button>
+        <button class="mi" id="lobby-share" data-act="room-invite" data-desc="Send the room code to friends."><span class="t">Share the code</span></button>
+        <p class="mnote" id="lobby-hint"></p>
+        <div id="lobby-host"></div>
+      </div>
+      <div class="mlist roster">
+        <div class="mlabel">Seats</div>
+        <div id="lobby-seats"></div>
+        <p class="mnote" id="lobby-rules"></p>
       </div>
     </div>
+    <footer class="mfoot"><button class="mback" data-act="room-leave" data-back aria-label="Leave the room"><b>‹</b> Leave</button><span class="mdesc" aria-live="polite"></span><span class="keys" aria-hidden="true"><kbd>←→</kbd> Change <kbd>Esc</kbd> Leave</span></footer>
   </section>
 
   <!-- ============ TAKE A SEAT (web build only) ============ -->
-  <section class="page screen artpage" id="s-claim">
-    <div class="backdrop" aria-hidden="true"><svg viewBox="0 0 150 100" preserveAspectRatio="xMidYMid slice"><use href="#art-online-1"/></svg></div>
-    <header class="page-head">
-      <button class="btn icon" data-act="room-leave" aria-label="Back"><svg class="ico"><use href="#ic-back"/></svg></button>
-      <h2>Joining</h2>
-    </header>
-    <div class="page-body scroll">
-      <p class="hint" id="claim-hint">This game is under way. The host is giving you one of the computer’s seats…</p>
-      <div class="seats" id="claim-seats"></div>
-      <button class="btn" id="claim-new" data-act="claim-new" hidden>I’m new here — give me a seat</button>
-      <button class="btn" id="claim-watch" data-act="claim-watch" hidden>Watch the game</button>
+  <section class="screen mscreen" id="s-claim">
+    <div class="art" aria-hidden="true"><svg viewBox="0 0 150 100" preserveAspectRatio="xMidYMid slice"><use href="#art-online-1"/></svg></div>
+    <div class="haze" aria-hidden="true"></div>
+    <header class="mhead"><h2>Joining</h2></header>
+    <div class="mbody">
+      <div class="mlist">
+        <p class="mnote" id="claim-hint">This game is under way. The host is giving you one of the computer’s seats…</p>
+        <div id="claim-seats"></div>
+        <button class="mi" id="claim-new" data-act="claim-new" hidden><span class="t">I’m new here</span><span class="s">Give me a seat</span></button>
+        <button class="mi" id="claim-watch" data-act="claim-watch" hidden><span class="t">Watch the game</span></button>
+      </div>
     </div>
+    <footer class="mfoot"><button class="mback" data-act="room-leave" data-back aria-label="Back"><b>‹</b> Back</button><span class="mdesc" aria-live="polite"></span></footer>
   </section>
 
 
@@ -1613,6 +1546,7 @@ input, textarea, [contenteditable] { -webkit-user-select: text; user-select: tex
     <button class="chip round hud" id="hud-menu" data-act="menu" aria-label="Menu"><svg class="ico"><use href="#ic-menu"/></svg></button>
     <button class="chip hud" id="hud-gold" data-act="sheet:income" aria-label="Gold"><svg class="ico gold-ico"><use href="#ic-gold"/></svg><span class="num" id="hud-gold-n">0</span><span class="neg" id="hud-supply" hidden></span><span class="pos" id="hud-income" hidden></span></button>
     <div class="crests hud" id="hud-crests" role="group" aria-label="Houses"></div>
+    <div class="turnflag hud" id="hud-turn" role="status" aria-live="polite" hidden></div>
     <button class="chip hud" id="hud-round" data-act="event-show" aria-label="Round"><span class="ev"><b id="hud-round-n">1</b></span><svg class="ico" id="hud-ev-ico" hidden><use href="#ic-ev-tempo"/></svg><span class="ev" id="hud-ev-name" hidden></span><span class="clock" id="hud-clock" hidden></span><span class="lbl">Turn</span></button>
     <button class="race hud" id="hud-race" data-act="sheet:board" aria-label="The race" hidden></button>
     <div class="toast hud" id="toast" role="status" aria-live="polite" hidden></div>
@@ -1621,7 +1555,7 @@ input, textarea, [contenteditable] { -webkit-user-select: text; user-select: tex
     <div class="actionbar hud" id="actionbar" hidden><div class="cap" id="ab-cap"></div><div class="row" id="ab-row"></div></div>
     <div class="caption hud" id="caption" hidden></div>
     <button class="endturn hud" id="hud-end" data-act="end-turn" aria-label="End turn"><svg><use href="#ic-endturn"/></svg><span class="badge" id="end-badge" hidden>0</span><span class="lbl">End turn</span></button>
-    <div class="ribbon" id="ribbon" hidden><svg class="rb"><use href="#ribbon"/></svg><svg class="cr"><use href="#crest-tower" id="ribbon-crest"/></svg><span id="ribbon-text"></span></div>
+    <div class="ribbon" id="hud-ribbon" hidden><svg class="rb" viewBox="0 0 400 80" preserveAspectRatio="none"><use href="#ribbon"/></svg><svg class="cr"><use href="#crest-tower" id="ribbon-crest"/></svg><span id="ribbon-text"></span></div>
 
     <!-- bottom sheet -->
     <div class="sheet-veil" id="sheet-veil" hidden></div>
@@ -4558,7 +4492,9 @@ const Online = (() => {
       lastVersion = state.version || 0;
       const k = keyOf(state); if (k !== turnKey) { turnKey = k; turnAt = Date.now(); }
       notifyTurn(state);
-      DB.collection(COLL).doc(room).set({ state: { ...toWire(state), _tl: turnLimit, _ta: turnAt } }, { merge: true })
+      // update() REPLACES the whole state; set(…, {merge:true}) merged nested maps, so a season's
+      // eventFlags (mud, winter, peace…) were never cleared for the other players.
+      DB.collection(COLL).doc(room).update({ state: { ...toWire(state), _tl: turnLimit, _ta: turnAt } })
         .catch(e => { console.error('[online] push failed', e); if (handlers.error) handlers.error('Could not reach the room'); });
     } catch (e) { console.error('[online] push failed', e); }
   }
@@ -4866,8 +4802,9 @@ async function checkOnlineBack() {
 function renderContinue() {
   const b = $('btn-continue');
   if (!b) return;
-  if (!saved && onlineBack && ui.screen === 'title' && !online()) { b.hidden = false; $('continue-label').textContent = `Back to your online game · Round ${onlineBack.round}`; b.setAttribute('aria-label', `Back to your online game, round ${onlineBack.round}`); return; }
-  if (saved && ui.screen === 'title') { b.hidden = false; $('continue-label').textContent = `Continue · Round ${saved.meta.round}`; b.setAttribute('aria-label', `Continue, round ${saved.meta.round}, ${saved.meta.turn}'s turn`); }
+  const sub = $('continue-sub');
+  if (!saved && onlineBack && ui.screen === 'title' && !online()) { b.hidden = false; $('continue-label').textContent = 'Back to your online game'; sub.textContent = `Round ${onlineBack.round}`; b.dataset.desc = 'Your seat is waiting.'; b.setAttribute('aria-label', `Back to your online game, round ${onlineBack.round}`); return; }
+  if (saved && ui.screen === 'title') { b.hidden = false; $('continue-label').textContent = 'Continue'; sub.textContent = `Round ${saved.meta.round}`; b.dataset.desc = 'Pick up where you left off.'; b.setAttribute('aria-label', `Continue, round ${saved.meta.round}, ${saved.meta.turn}'s turn`); }
   else b.hidden = true;
 }
 
@@ -4879,6 +4816,8 @@ function showScreen(name) {
   document.querySelectorAll('.screen').forEach(s => s.classList.toggle('on', s.id === 's-' + name));
   renderContinue();
   if (name === 'play') requestAnimationFrame(() => { renderAll(); });
+  const scr = $('s-' + name);
+  if (scr && scr.classList.contains('mscreen')) { if (name === 'title') delete menuSel[scr.id]; requestAnimationFrame(() => menuSync(scr)); }
   // A page that fits shows no fade; one that scrolls fades its last row.
   requestAnimationFrame(() => document.querySelectorAll('.screen.on .page-body.scroll').forEach(b => b.classList.toggle('fits', b.scrollHeight <= b.clientHeight + 2)));
 }
@@ -4887,21 +4826,83 @@ function goBack() { showScreen(ui.prev === 'play' && game ? 'play' : 'title'); }
 // ---------------------------------------------------------------- new game screen
 const setup = { count: 4, diff: 'medium', seats: [false, true, true, true, true, true], locked: 0 };  // seats[i] = ai?; locked = seats already claimed in a room
 function renderSetup() {
-  $('seg-count').innerHTML = [2, 3, 4, 5, 6].map(n => `<button role="radio" aria-checked="${n === setup.count}" aria-label="${n} players" data-act="count:${n}">${n}</button>`).join('');
   const di = Math.max(0, DIFFS.findIndex(d => d[0] === setup.diff));
-  const range = $('diff-range'); range.value = di; range.setAttribute('aria-valuetext', DIFFS[di][1]);
-  $('diff-slider').style.setProperty('--f', (di / 4).toFixed(3));
-  $('diff-stops').innerHTML = DIFFS.map(([k, l], i) => `<span class="${i === di ? 'on' : ''}" data-act="diff:${k}" role="button" aria-label="${l}"></span>`).join('');
-  $('diff-hint').innerHTML = `<b>${DIFFS[di][1]}</b> — ${DIFFS[di][2]}`;
-  $('seats').innerHTML = SEATS.slice(0, setup.count).map((s, i) => `
-    <div class="seat">
-      <div class="crest seatno" aria-hidden="true">${i + 1}</div>
-      <div class="toggle" role="radiogroup" aria-label="Seat ${i + 1}">
-        <button role="radio" aria-checked="${!setup.seats[i]}" data-act="seat:${i}:human"${i < setup.locked ? ' disabled' : ''}>${i < setup.locked ? esc(seatName(i)) : 'Human'}</button>
-        <button role="radio" aria-checked="${!!setup.seats[i]}" data-act="seat:${i}:ai"${i < setup.locked ? ' disabled' : ''}>Computer</button>
-      </div>
-    </div>`).join('');
-  requestAnimationFrame(() => { const el = $('seats'); el.classList.toggle('fits', el.scrollHeight <= el.clientHeight + 2); });
+  $('setup-opts').innerHTML = [
+    optRow({ key: 'count', label: 'Players', values: [2, 3, 4, 5, 6].map(n => [n, String(n)]), cur: setup.count, act: n => `count:${n}`, desc: 'From a duel for two to a war of six houses.' }),
+    optRow({ key: 'diff', label: 'Computer', values: DIFFS.map(d => [d[0], d[1]]), cur: setup.diff, act: k => `diff:${k}`, desc: DIFFS[di][2] + '.' }),
+    `<button class="mi gold" data-row="start" data-act="start" data-desc="Houses and their powers are dealt at random."><span class="t">Begin</span></button>`,
+  ].join('');
+  $('seats').innerHTML = SEATS.slice(0, setup.count).map((s, i) => optRow({
+    key: 'seat' + i, label: `<span class="no">${ROMAN[i]}</span>`, aria: `Seat ${i + 1}`,
+    values: i < setup.locked ? [['h', seatName(i)]] : [['human', 'Human'], ['ai', 'Computer']],
+    cur: i < setup.locked ? 'h' : setup.seats[i] ? 'ai' : 'human', act: v => `seat:${i}:${v}`, locked: i < setup.locked,
+    desc: i === 0 ? 'Human seats pass the device between turns.' : 'Houses and their powers are dealt at random.',
+  })).join('');
+}
+// Game-menu rows. A settings row reads like a console game's: the name on the left, ‹ value › on
+// the right. Tapping the row steps to the next value (wrapping); the arrows step either way.
+const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI'];
+function optRow({ key, label, aria, values, cur, act, desc = '', locked = false, cls = '' }) {
+  const n = values.length, i = Math.max(0, values.findIndex(v => v[0] === cur));
+  const name = aria || label, can = !locked && n > 1;
+  const arrow = (j, ch, side) => `<button class="arr" tabindex="-1" data-act="${can && j >= 0 && j < n ? act(values[j][0]) : 'noop'}"${can && j >= 0 && j < n ? '' : ' aria-disabled="true"'} aria-label="${esc(name)}: ${side}">${ch}</button>`;
+  return `<div class="opt${cls ? ' ' + cls : ''}${can ? '' : ' locked'}" data-row="${key}"${can ? ` data-act="${act(values[(i + 1) % n][0])}"` : ''} role="group" aria-label="${esc(name)}: ${esc(values[i][1])}" data-desc="${esc(desc)}">
+    <span class="k">${label}</span><span class="v">${arrow(i - 1, '‹', 'previous')}<b>${esc(values[i][1])}</b>${arrow(i + 1, '›', 'next')}</span></div>`;
+}
+// One row of each menu screen is always selected: the last one touched, hovered with a mouse or
+// reached with the arrow keys. The note for the selected row shows at the foot of the screen.
+const menuSel = {};
+const menuRows = scr => [...scr.querySelectorAll('.mi, .opt:not(.static)')].filter(e => e.offsetParent !== null);
+const menuKey = e => e.dataset.row || e.dataset.act || e.id || e.textContent.trim();
+function menuSelect(scr, el, scroll) {
+  scr.querySelectorAll('.sel').forEach(x => { if (x !== el) x.classList.remove('sel'); });
+  const d = scr.querySelector('.mdesc');
+  if (el) { el.classList.add('sel'); menuSel[scr.id] = menuKey(el); if (scroll) el.scrollIntoView({ block: 'nearest' }); }
+  if (d) { const t = (el && el.dataset.desc) || d.dataset.def || ''; if (d.textContent !== t) d.textContent = t; }
+}
+function menuSync(scr) {
+  const rows = menuRows(scr), k = menuSel[scr.id];
+  menuSelect(scr, rows.find(r => menuKey(r) === k) || rows[0] || null);
+}
+document.querySelectorAll('.mscreen').forEach(scr => {
+  let queued = false;
+  new MutationObserver(() => { if (queued) return; queued = true; requestAnimationFrame(() => { queued = false; if (scr.classList.contains('on')) menuSync(scr); }); })
+    .observe(scr, { childList: true, subtree: true, attributes: true, attributeFilter: ['hidden'] });
+});
+const rowAt = t => t && t.closest && t.closest('.mscreen .mi, .mscreen .opt:not(.static)');
+// pointermove, not pointerover: a row re-drawn under a resting mouse must not steal the selection from the keys
+document.addEventListener('pointermove', ev => { if (ev.pointerType !== 'mouse') return; const r = rowAt(ev.target); if (r && !r.classList.contains('sel')) menuSelect(r.closest('.mscreen'), r); });
+document.addEventListener('pointerdown', ev => { const r = rowAt(ev.target); if (r) menuSelect(r.closest('.mscreen'), r); }, true);
+document.addEventListener('focusin', ev => { const r = rowAt(ev.target); if (r) menuSelect(r.closest('.mscreen'), r); });
+document.addEventListener('keydown', ev => {
+  const scr = $('s-' + ui.screen);
+  if (!scr || !scr.classList.contains('mscreen') || ev.metaKey || ev.ctrlKey || ev.altKey) return;
+  const t = ev.target;
+  if (t && t.tagName === 'INPUT') {
+    if (ev.key === 'Enter') { ev.preventDefault(); if (t.id === 'online-code') { const j = scr.querySelector('[data-act="room-join"]'); if (j) j.click(); } else t.blur(); }
+    else if (ev.key === 'Escape' || ev.key === 'ArrowUp' || ev.key === 'ArrowDown') { t.blur(); if (ev.key !== 'Escape') menuKeys(scr, ev); else ev.preventDefault(); }
+    return;
+  }
+  menuKeys(scr, ev);
+});
+function menuKeys(scr, ev) {
+  const rows = menuRows(scr), cur = scr.querySelector('.sel'), i = rows.indexOf(cur);
+  switch (ev.key) {
+    case 'ArrowDown': case 'ArrowUp': case 'Tab': {
+      if (!rows.length) return;
+      ev.preventDefault();
+      const d = ev.key === 'ArrowUp' || (ev.key === 'Tab' && ev.shiftKey) ? -1 : 1;
+      menuSelect(scr, rows[i < 0 ? 0 : (i + d + rows.length) % rows.length], true); haptic('selection'); break; }
+    case 'ArrowLeft': case 'ArrowRight': {
+      const a = cur && cur.querySelectorAll('.arr')[ev.key === 'ArrowLeft' ? 0 : 1];
+      if (a) { ev.preventDefault(); a.click(); } break; }
+    case 'Enter': case ' ': {
+      if (!cur) return;
+      ev.preventDefault();
+      const inp = cur.querySelector('input'); if (inp) inp.focus(); else cur.click(); break; }
+    case 'Escape': case 'Backspace': {
+      const b = scr.querySelector('[data-back]'); if (b) { ev.preventDefault(); b.click(); } break; }
+  }
 }
 
 // ---------------------------------------------------------------- game start / resume
@@ -5392,6 +5393,22 @@ function nextIncome(q) {
   if (q.house.key === 'chancellor') inc += 2;
   return inc;
 }
+// Whose turn it is, in words, for any table with more than one person on it (online, or a shared phone).
+function renderTurnFlag() {
+  const f = $('hud-turn');
+  const people = game.players.filter(q => !q.ai).length;
+  const show = (online() || people > 1) && (game.phase === 'act' || game.phase === 'setup-castle');
+  $('frame').classList.toggle('has-turnflag', show);
+  if (!show) { f.hidden = true; return; }
+  const q = me(), mine = isHumanTurn();
+  const n = nick(q);
+  f.style.setProperty('--tc', col(q.id));
+  f.classList.toggle('mine', mine);
+  const crest = `<svg aria-hidden="true"><use href="#${crestOf(q.id)}"/></svg>`;
+  f.innerHTML = mine ? `${crest}<span class="t">${online() ? 'Your turn' : `${esc(dn(q))}’s turn`}</span>`
+    : `${crest}<span class="t">The ${esc(dn(q))}’s turn${n ? ` <span class="w">· ${esc(n)}</span>` : q.ai ? ' <span class="w">· computer</span>' : ''}</span>`;
+  f.hidden = false;
+}
 function renderHud() {
   if (!game) return;
   const p = me();
@@ -5425,6 +5442,7 @@ function renderHud() {
   }).join('');
   renderRace();
   fitCrests();
+  renderTurnFlag();
   // round chip
   const ev = game.currentEvent;
   $('hud-round-n').textContent = game.phase === 'setup-castle' ? 'Setup' : `${game.round}`;
@@ -5589,7 +5607,7 @@ function selectHex(h) {
   clearSel();
   if (!h) return;
   ui.sel = key(h.q, h.r);
-  if (game.phase === 'act' && h.unit && h.unit.owner === me().id) {
+  if (game.phase === 'act' && isHumanTurn() && h.unit && h.unit.owner === me().id) {
     for (const m of E.validMoves(game, h)) { const k = key(m.hex.q, m.hex.r); if (m.combat || m.siege) ui.hot.set(k, m); else ui.lit.set(k, m); }
   }
 }
@@ -5862,11 +5880,13 @@ async function onHexTap(h) {
   if (ui.busy) { if (ui.aiTurn) ui.skip = true; return; }
   if (!game || game.phase === 'over') return;
   if (ui.sheet) { closeSheet(); return; }
-  if (me().ai) return;
+  // Online, only the browser whose seat is moving may touch the board.
+  if (!isHumanTurn()) return;
   if (ui.spotKey && ui.spotTap) spotHide();
   if (game.phase === 'setup-castle') {
-    if (h && ui.lit.has(key(h.q, h.r))) { haptic('medium'); await run(() => E.placeCastle(game, h)); }
-    else { if (h) pipAt(h); toast('Choose a lit tile inside your home province'); }
+    const ok = h && (ui.lit.has(key(h.q, h.r)) || E.validCastleSites(game, me().id).some(x => x.q === h.q && x.r === h.r));
+    if (ok) { haptic('medium'); await run(() => E.placeCastle(game, h)); }
+    else { if (!ui.lit.size) { lightCastleSites(); renderAll(); } if (h) pipAt(h); toast('Choose a lit tile inside your home province'); }
     return;
   }
   ui.actReason = null;
@@ -5913,8 +5933,11 @@ async function onHexTap(h) {
 function pipAt(h) { const s = toScreen(h); const el = document.createElement('div'); el.className = 'pip'; el.style.left = s.x + 'px'; el.style.top = s.y + 'px'; $('fx').appendChild(el); setTimeout(() => el.remove(), 500); }
 
 // ---------------------------------------------------------------- commands + effects
-async function run(cmd, after) {
+// `forOther` = this browser is acting for an absent player (turn clock, skip-away). Otherwise,
+// online, a command for a seat that is not ours is refused outright.
+async function run(cmd, after, forOther) {
   if (ui.busy) return;
+  if (!forOther && online() && game && !ON.isMine(me())) return;
   ui.busy = true; renderHud(); $('actionbar').hidden = true;
   let r;
   try { r = cmd(); } catch (err) { console.error(err); ui.busy = false; toast('Something went wrong'); renderAll(); return; }
@@ -5948,6 +5971,9 @@ async function afterCommand(r, local) {
   if (online() && !ON.isMine(me())) { showWaiting(); return; }
   const stamp = `${game.round}:${game.turn}:${game.phase}`;
   if (ui.turnStamp !== stamp) { ui.turnStamp = stamp; await humanTurnBegins(); }
+  // Same turn, but a board just arrived from another browser (presence, a resync) and wiped the
+  // selection. During castle placement that took the lit tiles with it and every tap was refused.
+  else if (game.phase === 'setup-castle' && !ui.lit.size) { lightCastleSites(); renderAll(); }
 }
 async function humanTurnBegins() {
   if (!game || ui.screen !== 'play') return;
@@ -6141,8 +6167,8 @@ function coins(pid, gold) {
 }
 function showRibbon(p, text) {
   if (RM() || ui.skip) return;
-  const rb = $('ribbon'); rb.hidden = false; rb.style.setProperty('--rc', col(p.id));
-  $('ribbon-crest').setAttribute('href', `#${crestOf(p.id)}`); $('ribbon-text').textContent = text;
+  const rb = $('hud-ribbon'); rb.hidden = false; rb.style.setProperty('--rc', col(p.id));
+  $('ribbon-crest').setAttribute('href', `#${crestOf(p.id)}`); $('ribbon-text').textContent = text; rb.classList.toggle('long', text.length > 22);
   rb.style.animation = 'none'; void rb.offsetWidth; rb.style.animation = '';
   clearTimeout(rb._t); rb._t = setTimeout(() => { rb.hidden = true; }, 950);
 }
@@ -6388,8 +6414,8 @@ document.addEventListener('click', async ev => {
     case 'reclaim': await reclaimSeat(+a1); break;
     case 'skip-away': if (online() && game && !me().ai && !ON.isMine(me()) && ON.awayFor(me().clientId) >= 5 * 60e3) {
       toast(`Skipping the ${dn(me())}’s turn`);
-      if (game.phase === 'setup-castle') { const site = (E.validCastleSites(game, me().id) || [])[0]; if (site) await run(() => E.placeCastle(game, site)); }
-      else await run(() => E.endTurn(game, { force: true }));
+      if (game.phase === 'setup-castle') { const site = (E.validCastleSites(game, me().id) || [])[0]; if (site) await run(() => E.placeCastle(game, site), null, true); }
+      else await run(() => E.endTurn(game, { force: true }), null, true);
     } break;
     case 'claim-new': if (ON) { await ON.markReady(); $('claim-new').hidden = true; $('claim-seats').innerHTML = ''; $('claim-hint').textContent = 'The host is giving you one of the computer’s seats…'; } break;
     case 'claim-watch': claimSince = 0; showScreen('play'); computeBounds(); fitHome(true); renderAll(); await afterCommand(); break;
@@ -6509,14 +6535,17 @@ const BAD_ANY = ['fuck','fck','cunt','cocksuck','nigg','nigga','faggot','bitch',
 const BAD_WORD = ['shit','shits','fag','fags','dick','dicks','cock','cocks','cum','ass','arse','tit','tits','titty','boob','boobs','rape','raped','rapist','kike','spic','chink','gook','coon','dyke','homo','pedo','heil','wank','hoe','hoes','sex','sexy','anal','anus','knob','prick','piss','niger'];
 const LEET = { '0': 'o', '1': 'i', '3': 'e', '4': 'a', '5': 's', '7': 't', '8': 'b', '9': 'g', '@': 'a', '\u0024': 's', '!': 'i', '|': 'i', '+': 't' };
 const once = w => w.replace(/(.)\1+/g, '$1');   // "fuuuck" → "fuck", "pussy" → "pusy"
-const BAD_ANY1 = BAD_ANY.map(once).filter(w => w.length >= 4), BAD_WORD1 = BAD_WORD.map(once);   // 'kkk' → 'k' would match every k
+const BAD_ANY1 = BAD_ANY.map(once).filter(w => w.length >= 4);   // 'kkk' → 'k' would match every k
+// Whole words may be stretched ("shiiit") but not shortened: each letter run must be at least as long
+// as in the bad word, so 'boob' never matches Bob and 'ass' never matches "As".
+const BAD_WORD1 = BAD_WORD.map(w => new RegExp('^' + w.replace(/(.)\1*/g, m => `${m[0]}{${m.length},}`) + '\u0024'));   // \u0024 = end anchor; a literal one breaks build.js
 const BAD_STEM = ['shit'];   // bullshit, shithead — but not Matsushita
 function isOffensive(n) {
   const low = String(n || '').toLowerCase().replace(/[01345789@$!|+]/g, c => LEET[c] || c);
   const squashed = low.replace(/[^a-z]/g, '');
   if (BAD_ANY.some(w => squashed.includes(w)) || BAD_ANY1.some(w => once(squashed).includes(w))) return true;
   const words = [...low.split(/[^a-z]+/).filter(Boolean), squashed];   // "s h i t" counts as one word
-  return words.some(w => BAD_WORD.includes(w) || BAD_WORD1.includes(once(w)) || BAD_STEM.some(b => w.startsWith(b) || w.endsWith(b)));
+  return words.some(w => BAD_WORD.includes(w) || BAD_WORD1.some(r => r.test(w)) || BAD_STEM.some(b => w.startsWith(b) || w.endsWith(b)));
 }
 // Tidy a typed name: letters, digits, spaces and a little punctuation, 14 characters. Returns ''
 // for an empty or offensive name.
@@ -6587,19 +6616,18 @@ function renderOnline() {
   const last = ok && ON.lastRoom();
   const rj = $('btn-rejoin');
   rj.hidden = !last;
-  if (last) rj.textContent = `Rejoin ${last}`;
+  if (last) $('rejoin-label').textContent = `Rejoin ${last}`;
   const n = $('online-name'); if (!n.value) n.value = myName();
   if (ok) loadOpenGames();
 }
 async function loadOpenGames() {
   const box = $('open-games'); if (!box || !ON) return;
-  box.innerHTML = '<p class="hint">Looking for open games…</p>';
+  box.innerHTML = '<p class="mnote">Looking for open games…</p>';
   const list = await ON.listOpen();
-  box.innerHTML = list.length ? list.map(g => `<div class="seat">
-      <div class="crest">${ico('ic-houses', '')}</div>
-      <div class="nm">${esc(safeName(g.name) || 'Player')}’s game<span class="hint"> · ${g.live ? `under way · ${g.free} computer seat${g.free === 1 ? '' : 's'} to take` : `${g.seated} ${g.seated === 1 ? 'player' : 'players'} waiting`}</span></div>
-      <div class="toggle"><button data-act="open-join:${esc(g.code)}">Join</button></div></div>`).join('')
-    : '<p class="hint">No open games right now. Start one and turn on “Let anyone join”.</p>';
+  box.innerHTML = list.length ? list.map(g => `<button class="mi game" data-act="open-join:${esc(g.code)}" data-desc="Join ${esc(safeName(g.name) || 'Player')}’s game.">
+      <span class="t">${esc(safeName(g.name) || 'Player')}’s game</span><span class="go">Join <b>›</b></span>
+      <span class="s">${g.live ? `Under way · ${g.free} computer seat${g.free === 1 ? '' : 's'} to take` : `${g.seated} ${g.seated === 1 ? 'player' : 'players'} waiting`}</span></button>`).join('')
+    : '<p class="mnote">No open games right now. Start one and set it open to anyone.</p>';
 }
 const TURN_LIMITS = [[0, 'None'], [180, '3 min'], [600, '10 min'], [1800, '30 min'], [3600, '1 hr'], [43200, '12 hr'], [86400, '24 hr']];
 function openInfo() {
@@ -6617,33 +6645,32 @@ function lobbyTable() {
 }
 function renderLobby() {
   const T = lobbyTable(), hostNow = !!(ON && ON.isHost());
-  $('lobby-code').textContent = ON && ON.code() ? ON.code() : '';
+  $('lobby-code').innerHTML = ON && ON.code() ? `<span>Room</span><b>${esc(ON.code())}</b>` : '';
   $('lobby-start').hidden = !hostNow;
-  $('lobby-hint').textContent = hostNow
-    ? (T.waiting ? 'Share the code with friends. Start any time — the computer takes any seat still waiting.' : 'Everyone’s seated. Start when you’re ready.')
-    : 'You’re in! The game starts when the host is ready.';
-  $('lobby-host').hidden = !hostNow;
+  // the host reads what Start does in its note; everyone else is told they are waiting
+  $('lobby-hint').textContent = hostNow ? '' : 'You’re in. The game starts when the host is ready.';
+  $('lobby-start').dataset.desc = T.waiting ? 'Start any time. The computer takes any seat still waiting, and friends can join later to take one.' : 'Everyone’s seated. Start when you’re ready.';
   const rows = [];
-  T.seats.forEach((q, i) => rows.push(`<div class="seat">
-      <div class="crest seatno" aria-hidden="true">${i + 1}</div>
-      <div class="nm">${esc(safeName(q.name) || 'Player')}<span class="hint">${q.clientId === ON.clientId ? ' · you' : ''}${i === 0 ? ' · host' : ''}${q.clientId !== ON.clientId && ON.presence(q.clientId) === 'away' ? ' · away' : ''}</span></div></div>`));
-  for (let k = 0; k < T.waiting; k++) rows.push(`<div class="seat waiting">
-      <div class="crest seatno" aria-hidden="true">${rows.length + 1}</div>
-      <div class="nm"><span class="hint">Waiting for a player…</span></div>
-      ${hostNow ? '<div class="toggle"><button data-act="lobby-cpu:1">Use computer</button></div>' : ''}</div>`);
-  for (let k = 0; k < T.cpu; k++) rows.push(`<div class="seat cpu">
-      <div class="crest seatno" aria-hidden="true">${rows.length + 1}</div>
-      <div class="nm">Computer</div>
-      ${hostNow ? '<div class="toggle"><button data-act="lobby-cpu:-1">Save for a friend</button></div>' : ''}</div>`);
+  const still = (label, v) => `<div class="opt static"><span class="k">${label}</span><span class="v"><em>${v}</em></span></div>`;
+  T.seats.forEach((q, i) => rows.push(still(`<span class="no">${ROMAN[i]}</span>${esc(safeName(q.name) || 'Player')}`,
+    [q.clientId === ON.clientId ? 'You' : '', i === 0 ? 'Host' : '', q.clientId !== ON.clientId && ON.presence(q.clientId) === 'away' ? 'Away' : ''].filter(Boolean).join(' · ') || 'Joined')));
+  const open = (k, cpu) => {
+    const label = `<span class="no">${ROMAN[k]}</span>`;
+    if (!hostNow) return still(label, cpu ? 'Computer' : 'Waiting for a player…');
+    return optRow({ key: 'lseat' + k, label, aria: `Seat ${k + 1}`, values: [['wait', 'Open'], ['cpu', 'Computer']], cur: cpu ? 'cpu' : 'wait',
+      act: v => v === 'cpu' ? 'lobby-cpu:1' : 'lobby-cpu:-1', desc: cpu ? 'The computer plays this seat. A friend who joins later takes it over.' : 'Kept open for a friend. Change it to give the seat to the computer.' });
+  };
+  for (let k = 0; k < T.waiting; k++) rows.push(open(rows.length, false));
+  for (let k = 0; k < T.cpu; k++) rows.push(open(rows.length, true));
   $('lobby-seats').innerHTML = rows.join('');
   const dl = (DIFFS.find(d => d[0] === T.d) || DIFFS[2])[1], tl = (TURN_LIMITS.find(x => x[0] === T.t) || TURN_LIMITS[0])[1];
-  $('lobby-rules').textContent = `${T.n} players · ${dl} computer · ${T.t ? `${tl} per turn` : 'no turn limit'}${T.cpu || T.waiting ? ' · friends can join later and take a computer seat' : ''}`;
-  if (hostNow) {
-    $('lobby-count').innerHTML = [2, 3, 4, 5, 6].map(k => `<button role="radio" aria-checked="${k === T.n}" data-act="lobby-count:${k}"${k < Math.max(2, T.joined) ? ' disabled' : ''}>${k}</button>`).join('');
-    $('lobby-diff').innerHTML = DIFFS.filter(d => d[0] !== 'tutorial').map(([k, l]) => `<button role="radio" aria-checked="${k === T.d}" data-act="lobby-diff:${k}">${l}</button>`).join('');
-    $('lobby-limit').innerHTML = TURN_LIMITS.map(([sec, l]) => `<button role="radio" aria-checked="${ON.turnLimit() === sec}" data-act="turn-limit:${sec}">${l}</button>`).join('');
-    const o = $('lobby-open'); o.setAttribute('aria-checked', String(ON.isOpen())); o.textContent = ON.isOpen() ? 'Open to anyone ✓' : 'Let anyone join';
-  }
+  $('lobby-rules').textContent = hostNow ? '' : `${T.n} players · ${dl} computer · ${T.t ? `${tl} per turn` : 'no turn limit'}`;
+  $('lobby-host').innerHTML = !hostNow ? '' : [
+    optRow({ key: 'lcount', label: 'Players', values: [2, 3, 4, 5, 6].filter(k => k >= Math.max(2, T.joined)).map(k => [k, String(k)]), cur: T.n, act: k => `lobby-count:${k}`, desc: 'How many houses sit at the table, people and computer together.' }),
+    optRow({ key: 'ldiff', label: 'Computer', values: DIFFS.filter(d => d[0] !== 'tutorial').map(d => [d[0], d[1]]), cur: T.d, act: k => `lobby-diff:${k}`, desc: ((DIFFS.find(d => d[0] === T.d) || DIFFS[2])[2]) + '.' }),
+    optRow({ key: 'llimit', label: 'Turn limit', values: TURN_LIMITS.map(([sec, l]) => [sec, l]), cur: ON.turnLimit(), act: sec => `turn-limit:${sec}`, desc: 'How long each player has for a turn before it passes.' }),
+    optRow({ key: 'lopen', label: 'Open to all', values: [[false, 'No'], [true, 'Yes']], cur: ON.isOpen(), act: () => 'room-open', desc: ON.isOpen() ? 'Listed under Open games for anyone to join.' : 'Only people with the code can join.' }),
+  ].join('');
 }
 // Host: keep the plan consistent with who has joined (a friend arriving takes a waiting seat,
 // then a computer seat, then grows the table).
@@ -6719,10 +6746,9 @@ function renderClaim() {
   // nothing to take back: you are new here, so let the host seat you
   if (choosing && !back.length && mineEntry && ON) ON.markReady();
   const list = $('claim-seats');
-  if (list) list.innerHTML = back.length && choosing ? back.map(({ p, name, match }) => `<div class="seat${match ? ' match' : ''}">
-      <div class="crest" style="color:${col(p.id)}"><svg class="ico" aria-hidden="true"><use href="#${crestOf(p.id)}"/></svg></div>
-      <div class="nm">${esc(name)}<span class="hint"> · the ${esc(dn(p))} · away</span></div>
-      <div class="toggle"><button class="primary" data-act="reclaim:${p.id}">That’s me</button></div></div>`).join('') : '';
+  if (list) list.innerHTML = back.length && choosing ? back.map(({ p, name, match }) => `<button class="mi seatback${match ? ' match' : ''}" data-act="reclaim:${p.id}" data-desc="Take back this seat and carry on.">
+      <span class="t"><svg class="crest" style="color:${col(p.id)}" aria-hidden="true"><use href="#${crestOf(p.id)}"/></svg>${esc(name)}</span><span class="go">That’s me <b>›</b></span>
+      <span class="s">The ${esc(dn(p))} · away</span></button>`).join('') : '';
   $('claim-new').hidden = !(back.length && choosing && mineEntry);
   $('claim-hint').textContent = back.length && choosing
     ? 'Coming back from another phone or browser? Pick your seat to carry on where you left off.'
@@ -6809,7 +6835,7 @@ async function turnClock() {
   const key = `${game.round}:${game.turn}:${game.phase}`;
   if (ui.busy || me().ai || clockFired === key) return;
   // castle placement times out too: the castle goes on the first open site
-  const timeUp = () => { if (game.phase === 'setup-castle') { const site = (E.validCastleSites(game, me().id) || [])[0]; return site ? run(() => E.placeCastle(game, site)) : null; } return run(() => E.endTurn(game, { force: true })); };
+  const timeUp = () => { if (game.phase === 'setup-castle') { const site = (E.validCastleSites(game, me().id) || [])[0]; return site ? run(() => E.placeCastle(game, site), null, true) : null; } return run(() => E.endTurn(game, { force: true }), null, true); };
   if (left <= 0 && ON.isMine(me())) { clockFired = key; clearSel(); toast('Time’s up — turn ended'); await timeUp(); return; }
   const rank = aiDriverRank();
   if (rank >= 0 && !ON.isMine(me()) && left <= -(20 + rank * 8)) { clockFired = key; toast(`Time’s up for the ${dn(me())}`); await timeUp(); }
@@ -6862,7 +6888,6 @@ document.querySelectorAll('use').forEach(u => { const h = u.getAttribute('href')
 loadSettings();
 bumpVisit();
 wireOnline();
-$('diff-range').addEventListener('input', ev => { setup.diff = DIFFS[+ev.target.value][0]; haptic('selection'); renderSetup(); });
 renderSetup();
 loadSaved();
 showScreen('title');
@@ -6872,7 +6897,7 @@ showScreen('title');
   askForPush(); renderOnline(); $('online-code').value = c; showScreen('online');
 })();
 try { N && N.send && N.send({ type: 'ready' }); } catch (e) {}
-window.Nobles = { get game() { return game; }, ui, view, settings, E, run, ON, online, yourSeat, get vers() { return game && game.version; }, snapshot: () => vis, hexFromScreen, onHexTap, renderAll, toScreen, openSheet, closeSheet, fitHome, get saved() { return saved; } };
+window.Nobles = { get game() { return game; }, ui, view, settings, E, run, ON, online, yourSeat, isHumanTurn, showEvent, closeEvent, showRibbon, get vers() { return game && game.version; }, snapshot: () => vis, hexFromScreen, onHexTap, renderAll, toScreen, openSheet, closeSheet, fitHome, get saved() { return saved; } };
 })();
 
 </script>
