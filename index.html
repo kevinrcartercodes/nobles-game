@@ -824,6 +824,36 @@ input, textarea, [contenteditable] { -webkit-user-select: text; user-select: tex
 #s-title.on > .art svg { animation: mDrift 40s ease-in-out infinite alternate; transform-origin: 30% 40%; }
 @media (prefers-reduced-motion: reduce) { .mscreen.on .mhead, .mscreen.on .mbody, .mscreen.on .mtitle, #s-title.on > .art svg { animation: none; } }
 
+/* two-column menus (New game, Play online, lobby): settings on the left, the list fills the right-hand side */
+.mbody.two { grid-template-columns: minmax(0, 380px) minmax(0, 1fr); column-gap: clamp(24px, 6vw, 96px); }
+.mbody.two .roster { justify-self: end; width: 100%; max-width: 660px; }
+.mbody.two .roster .mlabel { font-size: calc(13px * var(--ts)); padding-top: 12px; padding-bottom: 10px; }
+.mbody.two .roster .opt { min-height: calc(var(--m-row) + 8px); padding-left: 22px; }
+.mbody.two .roster .opt .k { font-size: calc(16px * var(--ts)); }
+.mbody.two .roster .opt .v b { min-width: 6.4em; font-size: calc(22px * var(--ts)); }
+.mbody.two .roster .opt .arr { width: 44px; }
+.mbody.two .roster .mi { --m-item: calc(21px * var(--ts)); min-height: calc(var(--m-row) + 8px); padding-left: 22px; }
+.mbody.two .roster .mnote { margin-left: 22px; font-size: calc(18px * var(--ts)); }
+.opt.field .k { overflow: visible; }
+#online-name { width: 7.5em; }
+@container (max-height: 440px) {
+  .mbody.two .roster .opt, .mbody.two .roster .mi { min-height: var(--m-row); }
+  .mbody.two .roster .opt .v b { font-size: calc(20px * var(--ts)); }
+}
+@container (max-height: 390px) {
+  .mbody.two .roster .opt, .mbody.two .roster .mi { min-height: 38px; }
+  .mbody.two .roster .mlabel { padding-top: 6px; padding-bottom: 6px; }
+}
+@container (max-width: 760px) {
+  .mbody.two { grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); column-gap: 18px; }
+  .mbody.two .roster .opt { padding-left: 14px; }
+  .mbody.two .roster .opt .k { font-size: calc(13px * var(--ts)); }
+  .mbody.two .roster .opt .v b { min-width: 4.8em; font-size: calc(18px * var(--ts)); }
+  .mbody.two .roster .opt .arr { width: 30px; }
+  .mbody.two .roster .mi { --m-item: calc(17px * var(--ts)); padding-left: 14px; }
+  #online-name { width: 6em; }
+}
+
 </style>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
