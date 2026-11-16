@@ -858,6 +858,15 @@ input, textarea, [contenteditable] { -webkit-user-select: text; user-select: tex
   #online-name { width: 6em; }
 }
 
+/* title: the menu sits over the bright castle on phones — a deeper shade under the column and a soft shadow under the words */
+#s-title > .haze { background: linear-gradient(270deg, rgba(16,10,6,.95) 0%, rgba(16,10,6,.9) 34%, rgba(16,10,6,.78) 48%, rgba(16,10,6,.45) 58%, rgba(16,10,6,.1) 70%, rgba(16,10,6,0) 78%),
+  linear-gradient(0deg, rgba(16,10,6,.6) 0%, rgba(16,10,6,0) 22%); }
+#s-title .mtitle h1, #s-title .mtitle .tag, #s-title .mi, #s-title .mdesc { text-shadow: 0 1px 2px rgba(0,0,0,.9), 0 0 18px rgba(0,0,0,.75); }
+#s-title .mi:not(.sel) { color: rgba(244,234,214,.82); }
+@container (max-width: 760px) {
+  #s-title > .haze { background: linear-gradient(270deg, rgba(16,10,6,.95) 0%, rgba(16,10,6,.9) 40%, rgba(16,10,6,.75) 52%, rgba(16,10,6,.3) 62%, rgba(16,10,6,0) 74%), linear-gradient(0deg, rgba(16,10,6,.6) 0%, rgba(16,10,6,0) 22%); }
+}
+
 </style>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
