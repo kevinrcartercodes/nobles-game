@@ -826,10 +826,11 @@ input, textarea, [contenteditable] { -webkit-user-select: text; user-select: tex
 
 /* two-column menus (New game, Play online, lobby): settings on the left, the list fills the right-hand side */
 /* mirrored like the title: the choices sit in a column on the right, the list panel fills the space to their left */
-.mbody.two { grid-template-columns: minmax(0, 1fr) minmax(0, 380px); column-gap: clamp(24px, 5vw, 80px); }
-.mbody.two > .mlist:not(.roster) { order: 2; }
-.mbody.two .roster { order: 1; justify-self: start; width: 100%; max-width: 660px; }
-#s-new > .haze, #s-online > .haze, #s-lobby > .haze { background: linear-gradient(270deg, rgba(16,10,6,.94) 0%, rgba(16,10,6,.86) 34%, rgba(16,10,6,.6) 58%, rgba(16,10,6,.35) 100%),
+/* Kevin 2026-11-17: swapped — the choices on the left over the dark shade, the seat panel on the right, outlined like the in-game turn banner */
+.mbody.two { grid-template-columns: minmax(0, 380px) minmax(0, 1fr); column-gap: clamp(24px, 5vw, 80px); }
+.mbody.two > .mlist:not(.roster) { order: 1; }
+.mbody.two .roster { order: 2; justify-self: end; width: 100%; max-width: 660px; border: 3px solid var(--m-gold); border-radius: var(--r-lg); overflow: hidden; box-shadow: 0 6px 24px rgba(0,0,0,.45), inset 0 1px 0 rgba(217,176,106,.35); }
+#s-new > .haze, #s-online > .haze, #s-lobby > .haze { background: linear-gradient(90deg, rgba(16,10,6,.94) 0%, rgba(16,10,6,.86) 34%, rgba(16,10,6,.6) 58%, rgba(16,10,6,.35) 100%),
   linear-gradient(0deg, rgba(16,10,6,.7) 0%, rgba(16,10,6,0) 24%), linear-gradient(180deg, rgba(16,10,6,.5) 0%, rgba(16,10,6,0) 22%); }
 .mbody.two .roster .mlabel { font-size: calc(13px * var(--ts)); padding-top: 12px; padding-bottom: 10px; }
 .mbody.two .roster .opt { min-height: calc(var(--m-row) + 8px); padding-left: 22px; }
@@ -866,6 +867,33 @@ input, textarea, [contenteditable] { -webkit-user-select: text; user-select: tex
 @container (max-width: 760px) {
   #s-title > .haze { background: linear-gradient(270deg, rgba(16,10,6,.95) 0%, rgba(16,10,6,.9) 40%, rgba(16,10,6,.75) 52%, rgba(16,10,6,.3) 62%, rgba(16,10,6,0) 74%), linear-gradient(0deg, rgba(16,10,6,.6) 0%, rgba(16,10,6,0) 22%); }
 }
+
+/* title (Kevin 2026-11-17): the choices hug the right edge, over the darkest part of the shade */
+#s-title .mi { text-align: right; padding-left: 16px; padding-right: 16px; transition: color .16s ease, background-color .2s ease, padding-right .18s ease; }
+#s-title .mi .t { justify-content: flex-end; }
+#s-title .mi::before { left: auto; right: 0; }
+#s-title .mi.sel { padding-left: 16px; padding-right: 22px; background: linear-gradient(270deg, rgba(217,176,106,.2) 0%, rgba(217,176,106,.07) 55%, rgba(217,176,106,0) 100%); }
+#s-title .mi:active .t { transform: translateX(-2px); }
+#s-title .mfoot { justify-content: flex-end; text-align: right; padding-right: calc(var(--m-padr) + 16px); }
+#s-title .mi .t { margin-right: -.16em; }
+#s-title .mi { grid-template-columns: minmax(0, 1fr); }
+#s-title .mdesc { display: none !important; } /* Kevin 2026-11-17: no hint line on the title */
+/* the word is sized by fitTitleWord() to the slogan's width; drop the trailing letter-space so the edges match */
+#s-title .mtitle h1 { display: inline-block; margin-right: -.2em; line-height: .9; }
+#s-title .mtitle .logo { display: flex; flex-direction: column; align-items: flex-start; }
+#s-title .mtitle .tag { margin-right: -.26em; }
+/* Kevin 2026-11-17: a lighter shade so the painting still shows behind the menu */
+#s-title > .haze { background: linear-gradient(270deg, rgba(16,10,6,.68) 0%, rgba(16,10,6,.6) 30%, rgba(16,10,6,.4) 46%, rgba(16,10,6,.12) 62%, rgba(16,10,6,0) 76%),
+  linear-gradient(0deg, rgba(16,10,6,.35) 0%, rgba(16,10,6,0) 20%); }
+@container (max-width: 760px) {
+  #s-title > .haze { background: linear-gradient(270deg, rgba(16,10,6,.7) 0%, rgba(16,10,6,.62) 38%, rgba(16,10,6,.4) 52%, rgba(16,10,6,.1) 66%, rgba(16,10,6,0) 76%), linear-gradient(0deg, rgba(16,10,6,.35) 0%, rgba(16,10,6,0) 20%); }
+}
+.mbody.two .roster .mlabel { padding-right: 22px; } /* keep Refresh clear of the banner outline */
+/* Kevin 2026-11-17: the online menus (and New game, same layout) get the lighter shade too — the painting shows through */
+#s-new > .haze, #s-online > .haze, #s-lobby > .haze { background: linear-gradient(90deg, rgba(16,10,6,.7) 0%, rgba(16,10,6,.6) 30%, rgba(16,10,6,.35) 52%, rgba(16,10,6,.12) 100%),
+  linear-gradient(0deg, rgba(16,10,6,.45) 0%, rgba(16,10,6,0) 22%), linear-gradient(180deg, rgba(16,10,6,.35) 0%, rgba(16,10,6,0) 20%); }
+#s-new .mlist:not(.roster) .opt, #s-new .mlist:not(.roster) .mi, #s-online .mlist:not(.roster) .opt, #s-online .mlist:not(.roster) .mi,
+#s-lobby .mlist:not(.roster) .opt, #s-lobby .mlist:not(.roster) .mi, .mscreen .mhead h2, .mscreen .mdesc { text-shadow: 0 1px 2px rgba(0,0,0,.9), 0 0 18px rgba(0,0,0,.75); }
 
 </style>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -4859,6 +4887,7 @@ function showScreen(name) {
   document.querySelectorAll('.screen').forEach(s => s.classList.toggle('on', s.id === 's-' + name));
   renderContinue();
   if (name === 'play') requestAnimationFrame(() => { renderAll(); });
+  if (name === 'title') requestAnimationFrame(fitTitleWord);
   const scr = $('s-' + name);
   if (scr && scr.classList.contains('mscreen')) { if (name === 'title') delete menuSel[scr.id]; requestAnimationFrame(() => menuSync(scr)); }
   // A page that fits shows no fade; one that scrolls fades its last row.
@@ -6912,6 +6941,20 @@ function wireOnline() {
 function applyInsets() {
   if (N && N.insets) { const f = $('frame'); const i = N.insets; f.style.setProperty('--sal', (i.left || 0) + 'px'); f.style.setProperty('--sar', (i.right || 0) + 'px'); f.style.setProperty('--sab', (i.bottom || 0) + 'px'); f.style.setProperty('--sat', (i.top || 0) + 'px'); }
 }
+// title (Kevin 2026-11-17): NOBLES spans exactly the width of the slogan under it
+function fitTitleWord() {
+  const h = document.querySelector('#s-title .mtitle h1'), t = document.querySelector('#s-title .mtitle .tag');
+  if (!h || !t || !h.offsetWidth) return;
+  h.style.fontSize = '';
+  // the slogan hides on short phones: then the word fills the menu column instead
+  const col = h.closest('.mtitle'), cs = getComputedStyle(col);
+  const target = t.offsetWidth || (col.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight) - 32);
+  const base = parseFloat(getComputedStyle(h).fontSize);
+  h.style.fontSize = (base * target / h.offsetWidth).toFixed(2) + 'px';
+}
+window.addEventListener('resize', fitTitleWord);
+(document.fonts ? document.fonts.ready : Promise.resolve()).then(fitTitleWord);
+setTimeout(fitTitleWord, 400);
 window.addEventListener('resize', () => { if (ui.screen === 'play' && vis) { baseScale(); clampView(); applyView(); fitCrests(); if (ui.spotKey) checkTips(); } });
 document.addEventListener('visibilitychange', () => { if (document.hidden && game) save(); });
 window.addEventListener('error', ev => { console.error('[nobles]', ev.message); });
