@@ -900,6 +900,16 @@ input, textarea, [contenteditable] { -webkit-user-select: text; user-select: tex
 #s-online, #s-lobby, #s-claim { --ts0: var(--ts); }
 #s-online > *, #s-lobby > *, #s-claim > * { --ts: calc(var(--ts0) * 1.2); }
 
+/* Lobby seats: a player's name always shows in full. Names are smaller than the menu text,
+   the status note ("You · Host") gives way first, and open seats keep their number. */
+#lobby-seats .opt.static, #claim-seats .opt.static { grid-template-columns: auto minmax(0, 1fr); column-gap: 12px; }
+#lobby-seats .opt.static .k, #claim-seats .opt.static .k { overflow: visible; font-size: calc(14px * var(--ts0)) !important; letter-spacing: .05em; }
+#lobby-seats .opt.static .v, #claim-seats .opt.static .v { min-width: 0; justify-content: flex-end; }
+#lobby-seats .opt.static .v em, #claim-seats .opt.static .v em { min-width: 0; overflow: hidden; text-overflow: ellipsis; font-size: calc(15px * var(--ts0)); }
+#lobby-seats .opt .k .no, #claim-seats .opt .k .no { min-width: 2em; }
+#lobby-seats .opt:not(.static) .k { overflow: visible; min-width: 2em; }
+#lobby-seats .opt:not(.static) .v b { min-width: 4.6em; }
+
 </style>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
